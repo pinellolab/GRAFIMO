@@ -10,6 +10,15 @@ Graph-based Find Individual Motif Occurrences
 
 **pip installation**
 
+To build GRAFIMO on your machine, follow these steps:
+```
+git clone https://github.com/InfOmics/GRAFIMO.git
+pip install GRAFIMO
+grafimo --help
+```
+
+If the help is shown, you have succesfully built GRAFIMO
+
 **docker image**
 
 This option is suggested for MacOS and Windows users.
