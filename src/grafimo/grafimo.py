@@ -28,10 +28,13 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile,
     gplus=False # prevent unexpected behaviors
 
     printWelcomeMsg("WITH_VG_CREATION")
+    
+    ##TO DO:q-value computation
 
     vg_loc=vgc.create_vg(chroms, linear_genome, vcf) # create the vg
-    m=mtf.get_motif_pwm(motif, bgfile, pseudo) # create the motif
-    data=sge.get_data(vg_loc, bedfile, m.getWidth(), pipeline, gplus, chroms) # extract the region peaks
+    m=mtf.get_motif_pwm(motif, bgfile, pseudo, no_reverse) # create the motif
+    data=sge.get_data(vg_loc, bedfile, m.getWidth(), pipeline, gplus, 
+                          chroms, cores) # extract the region peaks
     df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse) # scoring
     
     objs_towrite=[df] # initialize the list of objects to save
@@ -44,8 +47,11 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motif, bgfile, pseudo,
     
     printWelcomeMsg("WITHOUT_VG_CREATION")
     
-    m=mtf.get_motif_pwm(motif, bgfile, pseudo)
-    data=sge.get_data(graph_genome, bedfile, m.getWidth(), pipeline, gplus, chroms)
+    ##TO DO:q-value computation
+    
+    m=mtf.get_motif_pwm(motif, bgfile, pseudo, no_reverse)
+    data=sge.get_data(graph_genome, bedfile, m.getWidth(), pipeline, gplus, 
+                          chroms, cores)
     df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse)
     
     objs_towrite=[df] # initialize the list of objects to save
@@ -66,4 +72,5 @@ def printWelcomeMsg(pipeline):
     for _ in range(35):
         print('*', end='')
     print('\n')
- 
+    
+    

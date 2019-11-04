@@ -103,7 +103,7 @@ def get_AP():
                            default='')
     group.add_argument("-b", "--bedfile", type=str, help='path to the BED file that defines the regions to score',
                            metavar='BEDFILE.bed')
-    group.add_argument("-m", "--motif", type=str, metavar='MOTIF.jaspar',
+    group.add_argument("-m", "--motif", type=str, metavar='MOTIF_FILE',
                            help='path to the motif file to use for the scoring of the sequences (JASPAR format required)')
     
     # optional arguments
@@ -225,16 +225,17 @@ def main(cmdLineargs=None):
     else:
         bedfile=args.bedfile
         
-    if args.motif.split('.')[-1]!='jaspar':
-        parser.error('Incorrect motif file given, JASPAR format allowed (visit http://jaspar.genereg.net)')
+    if args.motif.split('.')[-1]!='jaspar' and \
+        args.motif.split('.')[-1]!='meme':
+        parser.error('Incorrect motif file given, only JASPAR or MEME format allowed')
         
     else:
         motif=args.motif
         
     if args.bgfile:
-        bgfile=args.bgfile
+        bgfile=args.bgfile # we have a path to the bg file
     else:
-        bgfile=args.bgfile
+        bgfile=args.bgfile # empty string
         
     if args.pseudo <= 0:
         parser.error('The pseudocount cannot be less than or equal 0')
@@ -302,8 +303,10 @@ def main(cmdLineargs=None):
                                     pvalueT, no_reverse, dest, WITH_VG_CREATION, gplus, chroms) # add qvalue
             
     else:
-        code=he.throw_wrong_input_err()
-        sys.exit(code)
+        # error in the pipeline flag
+        msg="Error: wrong input. Unable to determine which pipeline to follow"
+        raise Exception(msg)
+        sys.exit(1)
         
     end=time.time()
     
@@ -317,6 +320,3 @@ if __name__=="__main__":
     
     
     
-
-
-

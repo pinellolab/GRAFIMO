@@ -33,6 +33,7 @@ class Motif(object):
     motif_matrix=pd.DataFrame()
     motif_matrix_scaled=pd.DataFrame()
     motif_pval_matrix=pd.DataFrame()
+    bg={} # background distribution
     width=-1
     minValue=-1
     motifID='' # jaspar ID
@@ -91,6 +92,14 @@ class Motif(object):
     def setMotif_pval_matrix(self, pval_mat):
         
         self.motif_pval_matrix=pval_mat
+        
+    def setBg(self, bgs):
+        if not isinstance(bgs, dict):
+            raise Exception("Error: unable to set the background distribution")
+            sys.exit(1)
+        
+        else:
+            self.bg=bgs
               
     def setWidth(self, width):
         
@@ -147,6 +156,10 @@ class Motif(object):
     def getMotif_pval_mat(self):
         
         return self.motif_pval_matrix
+    
+    def getBg(self):
+        
+        return self.bg
     
     def getWidth(self):
         
@@ -205,8 +218,30 @@ def isJaspar_ff(motif_file):
         
     else:
         return False # the motif file was not given as a path or the path is of length 0
+    
+def isMEME_ff(motif_file):
+    """
+        Check if the given file is in .meme format
+        ----
+        Parameters:
+            motif_file (str) : path to the motif file
+        ----
+        Returns:
+            (bool)
+    """
+    
+    if motif_file and isinstance(motif_file, str):
+        ff=motif_file.split('.')[-1]
+        
+        if ff=='meme':
+            return True
+        else:
+            return False
+        
+    else:
+        return False # the motif file was not given or the path is empty
             
-def build_motif_pwm_jaspar(motif_file, bg_file, pseudocount):
+def build_motif_pwm_jaspar(motif_file, bg_file, pseudocount, no_reverse):
     """
         Build the motif object, given a .jaspar motif file
         ----
@@ -214,6 +249,8 @@ def build_motif_pwm_jaspar(motif_file, bg_file, pseudocount):
             motif_file (str) : path to the motif file
             bg_file (str) : path to the background file
             pseudocount (float) : value to add to the motif counts
+            no_reverse (bool) : boolean value that declares if we wnat also the
+                                reverse complement to be taken into account
         ----
         Returns:
             motif (Motif) : returns a Motif object
@@ -221,13 +258,12 @@ def build_motif_pwm_jaspar(motif_file, bg_file, pseudocount):
     
     # check if the input file is in jaspar format
     if not isJaspar_ff(motif_file):
-        code=he.throw_not_jaspar_error()
-        sys.exit(code)
+        raise Exception("Error: the given mnotif file is not in JASPAR format")
+        sys.exit(1)
     
     # build the motif pwm
     nucs = []
     fqs = []
-    bgs=readBGfile(bg_file)
     
     try:
         mf=open(motif_file, mode='r') # open the file in reading only mode
@@ -246,68 +282,232 @@ def build_motif_pwm_jaspar(motif_file, bg_file, pseudocount):
             fqs.append(fq)
         
     except: # something went wrong
-        code=he.throw_motif_file_not_read_error()
-        sys.exit(code)
+        msg="Error: uanble to read motif "+motif_file
+        raise Exception(msg)
+        sys.exit(1)
             
-    finally:
-        mf.close() # close the motif file
+    else:    
+            
+        motif_count = pd.DataFrame(data=fqs, index=nucs) # raw counts
+        motif_width=len(motif_count.columns)
+        bgs=readBGfile(bg_file)
+        alphabet=sorted(nucs)
         
-    alphabet=''.join(nucs)
-            
-    motif_count = pd.DataFrame(fqs, index=nucs) # raw counts
-    motif_width=len(motif_count.columns)
+        bgs=pseudo_bg(bgs, no_reverse)
     
-    motif_prob = (motif_count/motif_count.sum(0)) # probabilities
-    motif_log_odds=pd.DataFrame(index=nucs, columns=range(motif_width), data=0)
+        motif_prob=(motif_count/motif_count.sum(0)) # get probabilities
+        motif_prob=norm_motif(motif_prob, motif_width, alphabet)
    
-    for j in range(motif_width): 
+        for j in range(motif_width): 
+            site_counts=sum(motif_count.loc[:,j])
+            total_counts=site_counts+pseudocount
+            for nuc in alphabet:
+                bg=bgs[nuc]
+                count=np.double((motif_prob.loc[nuc, j]*site_counts)+
+                                    (pseudocount*bg))
+                motif_prob.loc[nuc, j]=np.double(count/total_counts)
+                
+        # allocate the log-odds matrix
+        motif_log_odds=pd.DataFrame(index=nucs, columns=range(motif_width), 
+                                        data=np.double(0))
+            
+        tot_bg=np.double(0)
+        tot_fg=np.double(0)
         
-        site_counts=sum(motif_count.loc[:,j])
-        total_counts=site_counts+pseudocount
         for nuc in alphabet:
             bg=bgs[nuc]
-            freq = ((pseudocount*bg)+(motif_prob.loc[nuc,j]*site_counts))/total_counts
+            tot_bg+=bg
+            for j in range(motif_width):
+                prob=motif_prob.loc[nuc, j]
+                tot_fg+=prob
+                logodds=np.double(np.log2(prob/bg))
+                motif_log_odds.loc[nuc, j]=logodds
+                
+        # check if both the background and the foreground are next to 1
+        epsilon=0.001
+        assert tot_bg-1<epsilon
+        assert tot_fg-motif_width<epsilon
             
-            if freq <= 0:
-                freq = 0.0000005
-            if bg <= 0:
-                bg = 0.0000005
+        motif=Motif(motif_log_odds, motif_width, motifID=motifID, 
+                        motifName=motifName) # create the motif
+        alphabet=''.join(alphabet)
+        motif.setAlphabet(alphabet)
+        motif.setBg(bgs)
             
-            motif_log_odds.loc[nuc,j]=np.log2(freq/bg)
-            
-    motif=Motif(motif_log_odds, motif_width, motifID=motifID, 
-                    motifName=motifName) # create the motif
-    motif.setAlphabet(alphabet)
-            
-    return motif
+        return motif
+    
+    finally:
+        mf.close() # close the motif file anyway
 
-def scale_pwm(motif_matrix):
+def build_motif_pwm_MEME(motif_file, bg_file, pseudocount, no_reverse):
+    """
+        Build the motif object, given a .jaspar motif file
+        ----
+        Parameters:
+            motif_file (str) : path to the motif file
+            bg_file (str) : path to the background file
+            pseudocount (float) : value to add to the motif counts
+            no_reverse (bool) : boolean value that declares if we wnat also the
+                                reverse complement to be taken into account
+        ----
+        Returns:
+            motif (Motif) : returns a Motif object
+    """
+    
+    if not isMEME_ff(motif_file):
+        # if in other format we should not be here
+        raise Exception("Error: the motif file given is not in MEME format") 
+        sys.exit(1)
+        
+    try:
+        mf=open(motif_file, 'r') # open the file in read only mode
+        
+        infostart=False # flag to keep track were the infos about the motif begin
+        datastart=False # flag to keep track were the motif data begin
+        
+        A=[]
+        C=[]
+        G=[]
+        T=[]
+        
+        pos_read=0
+        
+        for line in mf:
+            if line[0:8]=='ALPHABET':
+                alphabet=sorted(list(set(line[10:-1])))
+                
+            if line[0:5]=='MOTIF':
+                motifID, motifName=line.split[1:3]
+                motifName=motifName[:-1] # remove \n char
+                # the informations about motif start here
+                infostart=True
+                continue
+            
+            if infostart:
+                infos=line[26:]
+                infosplit=infos.split(' ')
+                alphalen=int(infosplit[2])
+                
+                assert alphalen==len(alphabet)
+                
+                motif_width=int(infosplit[4])
+                site_counts=int(infosplit[6])
+                infostart=False # informations end here
+                
+                # allocate space for the motif probability matrix
+                motif_prob=pd.DataFrame(index=alphabet, 
+                                            columns=range(motif_width),
+                                            data=np.double(0))
+                
+                datastart=True # at next step begin data
+                continue
+            
+            if datastart and pos_read<motif_width:
+                freqs=line.split(' ')
+                A.append(np.double(freqs[1]))
+                C.append(np.double(freqs[3]))
+                G.append(np.double(freqs[5]))
+                T.append(np.double(freqs[7][:-1])) # remove \n char
+                pos_read+=1
+                
+    except: # something went wrong
+        msg="Error: unable to read motif "+motif_file
+        raise Exception(msg)
+        sys.exit(1)
+        
+    else:
+        motif_prob.loc['A']=A
+        motif_prob.loc['C']=C
+        motif_prob.loc['G']=G
+        motif_prob.loc['T']=T
+        
+        bgs=readBGfile(bg_file)
+        
+        bgs=pseudo_bg(bgs, no_reverse) 
+        
+        motif_prob=norm_motif(motif_prob, motif_width, alphabet)
+        
+        # build the scoring matrix
+        total_counts=site_counts+pseudocount
+        
+        for j in range(motif_width):
+            for nuc in alphabet:
+                bg=bgs[nuc]
+                count=np.double((motif_prob.loc[nuc, j]*site_counts)+
+                                    (pseudocount*bg))
+                motif_prob.loc[nuc, j]=np.double(count/total_counts)
+                
+        motif_log_odds=pd.DataFrame(index=alphabet, columns=range(motif_width),
+                                        data=np.double(0))
+        tot_bg=np.double(0)
+        tot_fg=np.double(0)
+        
+        for nuc in alphabet:
+            bg=bgs[nuc]
+            tot_bg+=bg
+            for j in range(motif_width):
+                prob=motif_prob.loc[nuc, j]
+                tot_fg+=prob
+                logodds=np.double(np.log2(prob/bg))
+                motif_log_odds.loc[nuc, j]=logodds
+                
+        # check if both the background and the foreground are next to 1
+        epsilon=0.001
+        assert tot_bg-1<epsilon
+        assert tot_fg-motif_width<epsilon
+        
+        motif=Motif(motif_log_odds, motif_width, motifID=motifID, 
+                        motifName=motifName)
+        alphabet=''.join(alphabet)
+        motif.setAlphabet(alphabet)
+        motif.setBg(bgs)
+        
+        return motif
+    
+    finally:
+        mf.close() # close the motif file stream anyway
+        
+def scale_pwm(motif_matrix, alphabet, motif_width):
     """
         Computes the scaled matrix, given a motif matrix
         ----
         Parameters:
             motif_matrix (str) : pat to the motif file
+            alphabet (str) : alphabet of the motif
+            motif_width (int) : width of the motif
         ----
         Returns:
             motif_matrix (pd.DataFrame) : scaled motif matrix
     """
     
     if not isinstance(motif_matrix, pd.DataFrame):
-        code=he.throw_motif_matrix_not_pd_dataframe()
-        sys.exit(code)
+        raise Exception("Error: unable to read the motif scoring matrix")
+        sys.exit(1)
         
     else:
     
+        RANGE_VALUE=1000 # values will be in [0, 1000]
         min_val=min(motif_matrix.min())
-        motif_matrix=motif_matrix - min_val
-    
         max_val=max(motif_matrix.max())
-        scale_factor=100.0/ float(max_val)
-        motif_matrix=round(motif_matrix * scale_factor)
+        motif_matrix_sc=pd.DataFrame(index=list(motif_matrix.index),
+                                         columns=list(motif_matrix.columns),
+                                         data=0)
+        
+        if min_val==max_val: # all values are equal
+            min_val=max_val-1
+        
+        offset=np.floor(min_val)
+        scale_factor=np.floor(RANGE_VALUE/(max_val-min_val))
+        
+        for nuc in alphabet:
+            for j in range(motif_width):
+                scaled_score=np.round((motif_matrix.loc[nuc, j]-(1*offset))*scale_factor)
+                motif_matrix_sc.loc[nuc, j]=scaled_score
     
-        motif_matrix[:]=motif_matrix[:].astype(int)
+        # make sure the values are integers
+        motif_matrix_sc[:]=motif_matrix_sc[:].astype(int)
      
-        return motif_matrix
+        return motif_matrix_sc
 
 def comp_pval_mat(motif):
     """
@@ -321,34 +521,37 @@ def comp_pval_mat(motif):
             motif (Motif) : motif object updated with the p-value matrix
     """    
     if not isinstance(motif, Motif):
-        code=he.throw_not_Motif_instance()
-        sys.exit(code)
+        msg="Error: the given object is not an instance of Motif. Unable to compute the p-value matrix"
+        raise Exception(msg)
+        sys.exit(1)
         
-    elif not motif.has_scaled_matrix():
-        code=he.throw_scaled_matrix_not_found()
-        sys.exit(code)
+    if not motif.has_scaled_matrix():
+        msg="Error: the scaled scoring matrix is missing. Unable to compute the p-value matrix"
+        raise Exception(msg)
+        sys.exit(1)
         
-    else:
+    RANGE=1000
+    scaled_mat=motif.getMotif_matrix_scaled()
     
-        scaled_mat=motif.getMotif_matrix_scaled()
-    
-        width=motif.getWidth()
-        alphabet=''.join(scaled_mat.index)
+    motif_width=motif.getWidth()
+    alphabet=motif.getAlphabet()
+    bgs=motif.getBg()
         
-        pval_mat=np.zeros((width, 100 * width + 1))
+    pval_mat=np.zeros((motif_width, RANGE*motif_width + 1))
     
-        for pos in range(width):
-            for nuc in alphabet:
-                if pos == 0:
-                    pval_mat[0, scaled_mat.loc[nuc, pos]] += 1
-                else:
-                    idxs=np.where(pval_mat[pos - 1, :] > 0)[0]
-                    for idx in idxs:
-                        pval_mat[pos, scaled_mat.loc[nuc, pos] + idx] += pval_mat[pos-1, idx]
+    for pos in range(motif_width):
+        for nuc in alphabet:
+            if pos==0:
+                pval_mat[0, scaled_mat.loc[nuc, pos]] += 1
+            else:
+                idxs=np.where(pval_mat[pos - 1, :]>0)[0]
+                bg=bgs[nuc]
+                for idx in idxs:
+                    pval_mat[pos, scaled_mat.loc[nuc, pos] + idx]+=pval_mat[pos-1, idx]*bg
                         
-        motif.setMotif_pval_matrix(pval_mat[width-1])
+    motif.setMotif_pval_matrix(pval_mat[motif_width-1])
                     
-        return motif
+    return motif
 
 def readBGfile(bg_file):
     """
@@ -386,8 +589,8 @@ def readBGfile(bg_file):
                 
         except:
             # something went wrong reading the background file
-            code=he.throw_not_able_to_read_bg_file()
-            sys.exit(code)
+            raise Exception("Error: unable to read the background file")
+            sys.exit(1)
         
         finally:
             bgf.close() # close the background file
@@ -400,7 +603,7 @@ def readBGfile(bg_file):
                 
     return bg_dict
 
-def get_motif_pwm(motif_file, bgs, pseudo):
+def get_motif_pwm(motif_file, bgs, pseudo, no_reverse):
     """
         Pipeline to build the motif object
         ----
@@ -408,15 +611,22 @@ def get_motif_pwm(motif_file, bgs, pseudo):
             motif_file (str) : path to the motif file
             bgs (str) : path to the background file
             pseudo (float) : value to add to the motif counts
+            no_reverse (bool) : flag that says if has to be taken into account 
+                                also the reverse complement
         ----
         Returns:
             motif (Motif) : motif object
     """
     
     if isJaspar_ff(motif_file):
-        motif=build_motif_pwm_jaspar(motif_file, bgs, pseudo)
+        motif=build_motif_pwm_jaspar(motif_file, bgs, pseudo, no_reverse)
         
-    sm=scale_pwm(motif.getMotif_matrix())
+    elif isMEME_ff(motif_file):
+        motif=build_motif_pwm_MEME(motif_file, bgs, pseudo, no_reverse)
+        
+    sm=scale_pwm(motif.getMotif_matrix(), motif.getAlphabet(), 
+                    motif.getWidth())
+
     motif.setMotif_matrix_scaled(sm)
         
     motif=comp_pval_mat(motif)
@@ -451,9 +661,117 @@ def get_uniformBG(alphabet):
         bg_dict.update({alphabet[i]:up})
             
     return bg_dict
+
+def pseudo_bg(bgs, no_reverse):
+    """ 
+        Apply the pseudo count to the background frequencies
+        ----
+        Parameters:
+            bgs (dict) : dictionary of the background probabilities
+        ----
+        Returns:
+            bgs (dict) : normalized (and normalized) background frequencies
+    """
+        
+    if not isinstance(bgs, dict):
+        raise Exception('Error: unable to normalize background frequencies')
+        sys.exit(1)
+        
+    if not no_reverse:
+        bgs=average_bg_with_rc(bgs)
+        
+    bgs=norm_bg(bgs)
     
+    return bgs
+        
+def average_bg_with_rc(bgs):
+    """
+        Average the background frequencies with the reverse complement
+        ----
+        Parameters:
+            bgs (dict) : dictionary of the background probabilities
+        ----
+        Returns:
+            bgs (dict) : averaged background probabilities
+    """
+    
+    RC={'A':'T', 'C':'G', 'G':'C', 'T':'A'}
+    
+    for nuc in bgs.keys():
+        rc=RC[nuc]
+        if RC[rc]==nuc and ord(nuc)<ord(rc):
+            avg_freq=np.double((bgs[nuc]+bgs[rc])/2.0)
+            bgs[nuc]=avg_freq
+            bgs[rc]=avg_freq
+            
+    return bgs
 
+def norm_bg(bgs):
+    """
+        Normalize the bakground frequencies
+        ----
+        Parameters:
+            Parameters:
+            bgs (dict) : dictionary of the background probabilities
+        ----
+        Returns:
+            bgs (dict) : normalized background probabilities
+    """
+    
+    pseudo=np.double(0.0000005)
+    alphabet=sorted(list(bgs.keys()))
+    tot=np.double(len(alphabet)*pseudo)
+    
+    for nuc in bgs.keys():
+        tot+=bgs[nuc]
+        
+    for nuc in bgs.keys():
+        bgs[nuc]=np.double((bgs[nuc]+pseudo)/tot)
+        
+    tot=np.double(0)
+    for nuc in bgs.keys():
+        tot+=bgs[nuc]
+    
+    assert tot!=0
+    
+    if not almost_equal(1, tot, 0):
+        for nuc in bgs.keys():
+            bgs[nuc]=np.double(bgs[nuc]/tot)
+            
+    return bgs
 
+def norm_motif(motif_probs, motif_width, alphabet):
+    """
+        Normalize the motif probabilities
+        ----
+        Parameters:
+            motif_probs (pd.DataFarme) : probability matrix
+            motif_width (int) : width of the motif
+            alphabet (list) : alphabet of the motif
+        ----
+        Returns:
+            motif_probs (pd.DataFrame) : normalized probability matrix
+    """
+    
+    tolerance=0.00001 # allowed tolerance in the difference between the position
+                      # probaility and 1
+                      
+    for j in range(motif_width):
+        tot=np.double(0)
+        for nuc in alphabet:
+            tot+=motif_probs.loc[nuc, j]
+            
+        if not almost_equal(1, tot, tolerance):
+            for nuc in alphabet:
+                motif_probs.loc[nuc, j]=np.double(motif_probs.loc[nuc, j]/tot)
                 
-
+    return motif_probs
+        
+        
+def almost_equal(value1, value2, slope):
+    
+    if (value1-slope)>value2 or (value1+slope)<value2:
+        return False
+    else:
+        return True
 

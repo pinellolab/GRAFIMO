@@ -11,6 +11,9 @@ results in a pandas DataFrame
 
 """
 
+#### add scanned sequences
+#### add scanned positions
+
 import pandas as pd
 from . import handle_exception as he
 from . import motif as mtf
@@ -52,15 +55,7 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse):
 
     else:   # the args are correct
         
-        for _ in range(20):
-            print('#', end='')
-        print() # newline
-        print('Scoring hits for motif ', motif.getMotifID())
-        print()
-        
-        for _ in range(20):
-            print('#', end='')
-        print() # newline
+        scoringPathsMsg(no_reverse, motif)
         
         if cores==0:
             N_CORES=mp.cpu_count()
@@ -120,24 +115,6 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse):
         finaldf=buildDF(motif, seqnames, starts, ends, strands, scores, 
                             pvalues, seqs)
             
-#        hitsFound=len(seqs)
-#        
-#        motifIDs=[motif.getMotifID()]*hitsFound #create an entryy for each hit
-#        motifNames=[motif.getMotifName()]*hitsFound
-#            
-#        finaldf=pd.DataFrame()
-#        finaldf['sequence_name']=seqnames
-#        finaldf['chromosome']=chroms
-#        finaldf['start']=starts
-#        finaldf['end']=ends
-#        finaldf['sequence']=seqs
-#        finaldf['score']=scores
-#        finaldf['pvalue']=pvalues
-#        finaldf['strand']=strands
-#        
-#        finaldf=finaldf.sort_values(['score'], ascending=False)
-#        finaldf.index=list(range(1, len(finaldf)+1))
-        
         return finaldf        
         
 def get_subgraphs_dict(sgs):
@@ -186,8 +163,8 @@ def score_subgraphs(sgs, motif, pvalueT, no_reverse, psid, returnDict):
     
     
     if set(sg_paths_dict.keys())!=set(sg_directions_dict.keys()): # there is no match beetwen the two dictionaries
-        code=he.throw_keys_diff_err()
-        sys.exit(code)
+        raise Exception("Error: no match between paths and strands")
+        sys.exit(1)
         
     min_score=motif.getMinValue() # is the same both for forward and reverse motif matrices
     seqs=[]
@@ -271,8 +248,11 @@ def score_subgraphs(sgs, motif, pvalueT, no_reverse, psid, returnDict):
                     
 def score_kmer(kmer, motif, min_score):
     
-    score=0
-    scaled_score=0
+    score=np.double(0)
+    scaled_score=int(0)
+    
+    score_matrix=motif.getMotif_matrix()
+    score_matrix_sc=motif.getMotif_matrix_scaled()
     
     for idx, nuc in enumerate(kmer):
         if nuc=='N':
@@ -281,8 +261,8 @@ def score_kmer(kmer, motif, min_score):
             
         nuc=nuc.upper() # if we have nucleotides in lower case
         
-        score+=motif.getMotif_matrix().loc[nuc, idx]
-        scaled_score+=motif.getMotif_matrix_scaled().loc[nuc, idx]
+        score+=score_matrix.loc[nuc, idx]
+        scaled_score+=score_matrix_sc.loc[nuc, idx]
     
     pvalue=compute_pvalue(scaled_score, motif)
     
@@ -290,10 +270,10 @@ def score_kmer(kmer, motif, min_score):
     
 def compute_pvalue(score, motif):
 
-    alphalen=len(motif.getAlphabet())    
-    total_seqs=float(math.pow(alphalen, motif.getWidth()))
+    pval_mat=motif.getMotif_pval_mat()  
+    total=np.double(sum(pval_mat[:]))
     
-    pvalue=(sum(motif.getMotif_pval_mat()[score:])/total_seqs)
+    pvalue=np.double((sum(pval_mat[score:]))/total)
     
     return pvalue
 
@@ -370,30 +350,33 @@ def buildDF(motif, seqnames, starts, ends, strands,
         #df['q-value']=qvalues
         df['matched_sequence']=sequences
         
-        df=df.sort_values(['score'], ascending=False)
+        # values are sorted by p-value
+        df=df.sort_values(['p-value'], ascending=True)
         df.index=list(range(1, dflen+1))
         
         return df
+    
+def scoringPathsMsg(no_reverse, motif):
+    
+    if not isinstance(motif, mtf.Motif):
+        msg='Error: the motif given is not an instance of Motif. Cannot get its ID'
+        raise Exception(msg)
+        sys.exit(1)
         
+    motifID=motif.getMotifID()
+    
+    for _ in range(20):
+            print('#', end='')
+    print() # newline
+    print('Scoring hits for motif +', motifID, sep='')
+    print()
+    
+    # if we score also the reverse complement
+    if not no_reverse: 
+        print('Scoring hits for motif -', motifID, sep='')
+        print()
         
-        
-
-
-    
-    
-    
-        
-    
-        
-    
-        
-    
-        
-    
-    
-    
-    
-    
-    
-        
+    for _ in range(20):
+        print('#', end='')
+    print() # newline
         

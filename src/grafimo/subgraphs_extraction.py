@@ -15,8 +15,13 @@ import warnings
 from . import handle_exception as he
 import sys
 import os
+import numpy as np
+import multiprocessing as mp
 
-def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, chroms):
+peak_no=int(1) # global var
+
+def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, 
+                 chroms, ncores):
     """
         returns the data necessary for the following steps of the analysis 
         pipeline
@@ -48,17 +53,46 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, chroms)
         sys.exit(1)
     
     try:
+        
+        NCORES=ncores
+        bedregions=getBEDregions(bedfile)
+        
+        # prepare for parellelization
+        jobs=[]
+        bedregions_splt=np.array_split(bedregions, NCORES)
+        
+        cwd=os.getcwd()
+        os.chdir(tmpwd)
+        
+        if bedfile[0:6]=='/Users':
+            pass # given an absolute path --> no problems
+        else:
+            bedfile=''.join(['../', bedfile]) # given a relative path
+                                              # NB we are inside .grafimo
+        
         if vg_creation_pipeline:
-            cwd=os.getcwd()
-            os.chdir(tmpwd)
-            vgc_sge(bedfile, TFBS_len, chroms)
+            
+            for i in range(NCORES):
+                p=mp.Process(target=vgc_sge, args=(bedregions_splt[i], 
+                                                       TFBS_len, chroms))
+                jobs.append(p)
+                p.start()
+                
+            for job in jobs:
+                job.join() # deadlock
         
         elif not vg_creation_pipeline:
-            cwd=os.getcwd()
-            os.chdir(tmpwd)
     
             if gplus:
-                no_vgc_sge_gplus(genome_loc, bedfile, TFBS_len, chroms)
+                for i in range(NCORES):
+                    p=mp.Process(target=no_vgc_sge_gplus, 
+                                     args=(genome_loc, bedregions_splt[i], 
+                                               TFBS_len, chroms))
+                    jobs.append(p)
+                    p.start()
+                    
+                for job in jobs:
+                    job.join() # deadlock
         
             else:
                 if genome_loc[0]=='~':
@@ -66,21 +100,29 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, chroms)
                 else:
                     genome_loc=''.join(['../', genome_loc])
                     
-                no_vgc_sge(genome_loc, bedfile, TFBS_len)
+                for i in range(NCORES):
+                    p=mp.Process(target=no_vgc_sge, 
+                                     args=(genome_loc, bedregions_splt[i],
+                                               TFBS_len))
+                    jobs.append(p)
+                    p.start()
+                    
+                for job in jobs:
+                    job.join() # deadlock
             
         else:
             # with enter an unknown value for the pipeline
-            raise Exception('pipeline not recognized')
+            raise Exception('Error: pipeline not recognized')
             sys.exit(1) # the workframe fails
         
     except:
         cmd='rm -rf {0}'.format(tmpwd) # clean the directory from tmp data
         code=subprocess.call(cmd)
         if code!=0:
-            raise Exception('error while executing a shell command (rm)')
+            raise Exception('Error: error while executing a shell command (rm)')
             sys.exit(1) # exit for the shell cmd error
        
-        raise Exception('subgraphs extraction failed')
+        raise Exception('Error: subgraphs extraction failed')
         sys.exit(1) # failure in subgraphs extraction
         
     else:
@@ -124,15 +166,16 @@ def vgc_sge(bedfile, TFBS_len, chroms):
             None
     """
     
-    if bedfile[0:6]=='/Users':
-        pass
-    else:
-        bedfile=''.join(['../', bedfile])
+#    if bedfile[0:6]=='/Users':
+#        pass
+#    else:
+#        bedfile=''.join(['../', bedfile])
     
-    peak_no=1
     
     try:
-        bed=open(bedfile, mode='r') # open the bedfile in read only mode
+        #bed=open(bedfile, mode='r') # open the bedfile in read only mode
+        
+        global peak_no
         
         if chroms:
             CHR_LIST=[''.join(['chr', c]) for c in chroms]
@@ -141,7 +184,7 @@ def vgc_sge(bedfile, TFBS_len, chroms):
             CHR_LIST=list(range(1,23))+['X', 'Y']
             CHR_LIST=[''.join(['chr', str(c)]) for c in CHR_LIST]
         
-        for line in bed:
+        for line in bedfile:
             print('Peak ', peak_no)
             chrom, start, end = line.split('\t')[0:3]
             print('Extracting region:', chrom, '['+start+'-'+end+']')
@@ -198,8 +241,8 @@ def vgc_sge(bedfile, TFBS_len, chroms):
         # something went wrong while reading the bedfile
         sys.exit(1)
         
-    else:
-        bed.close() # close the bedfile
+    #else:
+     #   bed.close() # close the bedfile
         
 
 def no_vgc_sge(xg, bedfile, TFBS_len):
@@ -214,20 +257,20 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
         Returns:
             None
     """
-    if bedfile[0:6]=='/Users':
-        pass # given an absolute path
-    else:
-        bedfile=''.join(['../', bedfile])
+#    if bedfile[0:6]=='/Users':
+#        pass # given an absolute path
+#    else:
+#        bedfile=''.join(['../', bedfile])
     
-    peak_no=1
+    global peak_no
     
     try:
-        bed=open(bedfile, mode='r') # open the bedfile in read only mode
+        #bed=open(bedfile, mode='r') # open the bedfile in read only mode
         
         CHR_LIST=list(range(1,23))+['X', 'Y']
         CHR_LIST=[''.join(['chr', str(c)]) for c in CHR_LIST]
         
-        for line in bed:
+        for line in bedfile:
             print('Peak ', peak_no)
             chrom, start, end = line.split('\t')[0:3]
             print('Extracting region:', chrom, '['+start+'-'+end+']')
@@ -282,26 +325,22 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
         # something went wrong while reading the bedfile
         sys.exit(1)
         
-    finally:
-        bed.close() # close the bedfile
+    #finally:
+        #bed.close() # close the bedfile
         
 
 def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
         
-    if bedfile[0:6]=='/Users':
-        pass # given an absolute path --> no problems
-    else:
-        bedfile=''.join(['../', bedfile]) # given a relative path
-        
+    # check the path to xgs
     if xg[0:6]=='/Users':
         pass
     else:
         xg=''.join(['../', xg])
     
-    peak_no=1
+    global peak_no
     
     try:
-        bed=open(bedfile, mode='r')
+        #bed=open(bedfile, mode='r')
         
         if chroms:
             CHR_LIST=[''.join(['chr', c]) for c in chroms]
@@ -310,7 +349,7 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
             CHR_LIST=list(range(1,23))+['X', 'Y']
             CHR_LIST=[''.join(['chr', str(c)]) for c in CHR_LIST]
         
-        for line in bed:
+        for line in bedfile:
             
             print('Peak ', peak_no)
             chrom, start, end = line.split('\t')[0:3]
@@ -367,7 +406,8 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
         sys.exit(1)
         
     else:
-        bed.close() # close the bedfile
+        #bed.close() # close the bedfile
+        pass
         
     
 def correct_path(path, path_id='', file_format=''):
@@ -435,3 +475,34 @@ def isGraph_genome_xg(graph_genome):
         else:
             return False
     
+def getBEDregions(bedfile):
+    """
+        Function to retrieve the number of regions defined in the given BED
+        ----
+        Parameters:
+            bedfile (str) : path to the bedfile to read
+        ----
+        Returns: 
+            regions (list) : array of the regions defined in the BED file
+    """
+    
+    if bedfile.split('.')[-1]!='bed': #not a BED file
+        raise Exception("Error: the given file is not in BED format")
+        sys.exit(1)
+        
+    regions=[]    
+    
+    try:
+        b=open(bedfile, mode='r') # open the BED file in read only mode
+        
+        for line in b:
+            regions.append(line)
+            
+    except: # not able to read the BED file
+        msg=' '.join(["Error: unable to read", bedfile])
+        raise Exception(msg)
+        sys.exit(1)
+        
+    else:
+        return regions
+            

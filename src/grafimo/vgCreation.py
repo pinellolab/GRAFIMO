@@ -220,6 +220,3 @@ def tbiexist(directory):
     
     return False
         
-  
-    
-
