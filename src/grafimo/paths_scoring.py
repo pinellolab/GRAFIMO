@@ -21,9 +21,9 @@ import sys
 import os
 import multiprocessing as mp
 import numpy as np
-import math
 import glob
 import subprocess
+from decimal import Decimal
 
 def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse):
     """
@@ -222,7 +222,7 @@ def score_subgraphs(sgs, motif, pvalueT, no_reverse, psid, returnDict):
                     score, pvalue=score_kmer(kmer, motif, min_score)
                     strand='-'
                     
-                if pvalue <= pvalueT: 
+                if pvalue < pvalueT: 
                     seqs.append(kmer)
                     scores.append(score)
                     pvalues.append(pvalue)
@@ -352,6 +352,7 @@ def buildDF(motif, seqnames, starts, ends, strands,
         
         # values are sorted by p-value
         df=df.sort_values(['p-value'], ascending=True)
+
         df.index=list(range(1, dflen+1))
         
         return df

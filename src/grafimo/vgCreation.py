@@ -142,30 +142,30 @@ def create_vg(chroms, linear_genome='', vcf=''):
         for chrom_n in chroms:
             chrom=''.join(['chr', chrom_n])
             
-        vg=chrom+'.vg'
-        xg=chrom+'.xg'
+            vg=chrom+'.vg'
+            xg=chrom+'.xg'
         
-        vg_construct='vg construct -C -R {0} -p -n {1}={2} -r {3} -v {4} > {5}'.format(chrom_n, chrom_n, \
+            vg_construct='vg construct -C -R {0} -p -n {1}={2} -r {3} -v {4} > {5}'.format(chrom_n, chrom_n, \
                                                                                      chrom, linear_genome, vcf, vg)
         
-        code=subprocess.call(vg_construct, shell=True)     
-        if code!=0:  
-            msg='error in vg construct. '
-            msg+='Unable to build the vg of the genome using {0} and {1}'.format(linear_genome,
+            code=subprocess.call(vg_construct, shell=True)     
+            if code!=0:  
+                msg='error in vg construct. '
+                msg+='Unable to build the vg of the genome using {0} and {1}'.format(linear_genome,
                                                                                     vcf)
-            raise Exception(msg) # we have errors in vg creation
-            sys.exit(1)
+                raise Exception(msg) # we have errors in vg creation
+                sys.exit(1)
             
-        print('Indexing the VG...')
+            print('Indexing the VG...')
             
-        vg_index='vg index -p -x {0} {1}'.format(xg, vg)
-        code=subprocess.call(vg_index, shell=True)
-        cmd='rm {0}'.format(vg)
-        subprocess.call(cmd, shell=True)
+            vg_index='vg index -p -x {0} {1}'.format(xg, vg)
+            code=subprocess.call(vg_index, shell=True)
+            cmd='rm {0}'.format(vg)
+            subprocess.call(cmd, shell=True)
         
-        if code!=0:     # we have errors in the vg indexing
-            raise Exception('error in vg index. Unable to index the geneome graph')
-            sys.exit(1)
+            if code!=0:     # we have errors in the vg indexing
+                raise Exception('error in vg index. Unable to index the geneome graph')
+                sys.exit(1)
             
     fileloc=os.getcwd()
             

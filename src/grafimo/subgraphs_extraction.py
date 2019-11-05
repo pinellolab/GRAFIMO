@@ -505,4 +505,5 @@ def getBEDregions(bedfile):
         
     else:
         return regions
-            
+    
+    

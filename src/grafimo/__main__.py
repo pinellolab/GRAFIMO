@@ -4,7 +4,8 @@ GRAFIMO version {version}
 
 Copyright (C) 2019 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@studenti.univr.it>
 
-GRAFIMO scores sequences likely to be transcription binding sites in ChIP-seq peaks
+GRAph-based Find Individual Motif Occurrences scores sequences likely to be 
+transcription binding sites in ChIP-seq peaks
 
 Usage:
     grafimo --cores [NCORES] --linear_genome [LINEAR_GENOME.fa] --vcf [VCF.vcf.gz] --bedfile [BEDFILE.bed] --motif [MOTIF.jaspar] [options]
@@ -16,8 +17,8 @@ The tool takes in input both a linear genome (in .fa format) and a vcf file
 The results will be written to a .csv file in the directory specified by the user
 (--o option or defalut value 'grafimo_out').
 
-The tool is also error tollearnt in the subgrapahs extraction, since it doesn't 
-stop its execution although we have some exceptions.
+The tool is also error tollerant in the subgrapahs extraction, since it doesn't 
+stop its execution although we can have some exceptions.
 
 Citation:
     
@@ -34,9 +35,7 @@ from grafimo.grafimo import __version__, with_vg_pipeline, without_vg_pipeline
 import grafimo.handle_exception as he
 import time
 import sys
-import glob
 import multiprocessing as mp
-import subprocess
 import grafimo.vgCreation as vgc
 
 
@@ -310,7 +309,7 @@ def main(cmdLineargs=None):
         
     end=time.time()
     
-    print('elapsed time', end-start)
+    print('\nelapsed time', end-start)
     
     
 ### run main  point ###

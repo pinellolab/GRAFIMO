@@ -377,7 +377,7 @@ def build_motif_pwm_MEME(motif_file, bg_file, pseudocount, no_reverse):
                 alphabet=sorted(list(set(line[10:-1])))
                 
             if line[0:5]=='MOTIF':
-                motifID, motifName=line.split[1:3]
+                motifID, motifName=line.split(' ')[1:3]
                 motifName=motifName[:-1] # remove \n char
                 # the informations about motif start here
                 infostart=True
