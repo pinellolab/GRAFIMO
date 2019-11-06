@@ -34,7 +34,7 @@ There are two available ways to get grafimo running on your machine using docker
 First option:
  clone GRAFIMO repository, enter it, build the docker image and run it following these commands:
  ```
- git clone https://github.com/InfOmics/GRAFIMO.git
+ git clone https://github.com/pinellolab/GRAFIMO.git
  cd GRAFIMO
  docker build -t grafimo .
  docker run -it grafimo
