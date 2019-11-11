@@ -4,8 +4,12 @@ Build GRAFIMO
 
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+from distutils.version import LooseVersion
+from distutils.command.sdist import sdist as sd
+from distutils.command.build_ext import build_ext as be
 import sys
+from grafimo.grafimo import __version__ as grafimo_version
 
 
 if sys.version_info[:2] < (3,7): # python 3.7 is required
@@ -22,20 +26,65 @@ encoding_arg={'encoding':'utf-8'} if sys.version_info[0] >= 3 else dict()
 readme='README.md'
 with open(readme, **encoding_arg) as infile:
     long_description=infile.read()
-    
+
+# Cython code build
+CYTHON_V_REQUIRED='0.28' # minimum Cython version required
+
+def check_cython():
+    """
+        Check Cython version
+    """
+
+    try:
+        from Cython import __version__ as cyv
+
+    except ImportError:
+        sys.stderr.write("Cython not found on your machine. Install Cython >= "+
+                            str(CYTHON_V_REQUIRED))
+        sys.exit(1)
+
+    if LooseVersion(cyv) < LooseVersion(CYTHON_V_REQUIRED):
+        sys.stderr.write("Found Cython v" + str(cyv)+" . Cython v"+
+                            str(CYTHON_V_REQUIRED)+" is required")
+        sys.exit(1)
+
+extensions=[
+    Extension('motif_processing', sources=['src/grafimo/motif_processing.pyx']),
+    Extension('GRAFIMOscoring', sources=['src/grafimo/scoring.pyx']),
+]
+
+class BuildExt(be):
+
+    def run(self):
+
+        check_cython()
+        from Cython.Build import cythonize
+        self.extensions=cythonize(self.extensions)
+
+        super().run()
+
+class SDist(sd):
+
+    def run(self):
+
+        check_cython()
+        from Cython.Build import cythonize
+        cythonize(extensions)
+        super().run()
 
 # definition of setup()
+gfv=str(grafimo_version)
 setup(
       name='grafimo',
-      version='0.6',
+      version=gfv,
       author='Manuel Tognon',
       author_email='manu.tognon@gmail.com',
       url='https://github.com/InfOmics/GRAFIMO',
       description='GRAph-based Find Indivividual Motif Occurrences',
       long_description=long_description,
       license='MIT', 
-      #include_package_data = True,
-      #package_data={'grafimo': ['./*']}, 
+      cmdclass={'build_ext': BuildExt, 'sdist': SDist},
+      ext_modules=extensions,
       packages=find_packages('src'),
       package_dir={'':'src'},
       entry_points={'console_scripts':['grafimo = grafimo.__main__:main']},
@@ -43,6 +92,9 @@ setup(
               'pandas~=0.24.2',
               'numpy~=1.16.4',
               ],
+      extras_require={
+          'dev': ['Cython']
+      },
       python_requires='>=3.7',
       classifiers=[
         "Development Status :: 1 - Beta",
