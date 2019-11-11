@@ -21,6 +21,7 @@ DNA_ALPHABET=['A', 'C', 'G', 'T'] # dna alphabet (we ignore the N and the IUPAC 
 REV_COMPL={'A':'T', 'C':'G', 'G':'C', 'T':'A'}
 LOG_FACTOR=1.44269504
 RANGE=1000
+CHROMS_LIST=[str(i) for i in range(1, 23)] + ['X', 'Y']
 
 """
     functions from utils.py
@@ -134,3 +135,35 @@ def lg2(value):
 
     return (np.log(value)*LOG_FACTOR)
 
+
+def printWelcomeMsg(pipeline):
+    """
+        Prints the initial message for GRAFIMO
+        ----
+        Params:
+            pipeline (str) : chosen pipeline
+        ----
+        Returns:
+             None
+    """
+    for _ in range(35):
+        print('*', end='')
+    print()
+    print("\tWELCOME TO GRAFIMO v", __version__, sep='')
+    print()
+    print("Beginning the " + pipeline + " pipeline")
+    print()
+
+    for _ in range(35):
+        print('*', end='')
+    print('\n')
+
+
+def correct_path(path, path_id='', file_format=''):
+
+    if path[-1:] == '/':
+        new_path = ''.join([path, path_id, file_format])
+    else:
+        new_path = ''.join([path, '/', path_id, file_format])
+
+    return new_path

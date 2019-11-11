@@ -19,6 +19,7 @@ from . import motif as mtf
 from . import paths_scoring as ps
 from . import vgCreation as vgc
 from . import objs_writer as ow
+from grafimo.utils import printWelcomeMsg
 
 __version__='0.8'
 
@@ -58,19 +59,5 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motif, bgfile, pseudo,
     ##TO DO: matplotlib or seaborn plots 
     ##TO DO: add plots objects to objs_toWrite() 
     ow.writeresults(objs_towrite, dest)
-    
-def printWelcomeMsg(pipeline):
-    
-    for _ in range(35):
-        print('*', end='')
-    print()
-    print("\tWELCOME TO GRAFIMO v", __version__, sep='')
-    print()
-    print("Beginning the "+ pipeline+" pipeline")
-    print()
-    
-    for _ in range(35):
-        print('*', end='')
-    print('\n')
-    
+
     

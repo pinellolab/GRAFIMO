@@ -199,3 +199,31 @@ class SubprocessException(Exception):
     def __str__(self):
 
         repr(self.message)
+
+class VGException(Exception):
+    """
+        Raise an exception for errors regarding vg tool
+    """
+
+    def __init__(self, message):
+
+        self.message=message
+
+    def __str__(self):
+
+        repr(self.message)
+
+class PipelineException(Exception):
+    """
+        Raise an exception when an error is encountered during the
+        pipeline choice or initialization
+    """
+
+    def __init__(self, message):
+
+        self.message=message
+
+    def __str__(self):
+
+        repr(self.message)
+

@@ -26,13 +26,14 @@ Citation:
     
     
 Run 'grafimo --help'to see all command-line options.
-See https://github.com/pinellolab/GRAFIMO for the full documentation.
+See https://github.com/InfOmics/GRAFIMO for the full documentation.
 
 """
 
 from argparse import ArgumentParser, SUPPRESS, HelpFormatter
 from grafimo.grafimo import __version__, with_vg_pipeline, without_vg_pipeline
-import grafimo.handle_exception as he
+from grafimo.GRAFIMOException import VGException, PipelineException
+from grafimo.utils import die
 import time
 import sys
 import multiprocessing as mp
@@ -214,7 +215,7 @@ def main(cmdLineargs=None):
             graph_genome_dir=args.graph_genome_dir
 
         else:
-            graph_genome_dir=args.graph_genome_dir+'/'
+            graph_genome_dir=''.join([args.graph_genome_dir, '/'])
             
         WITH_VG_CREATION=False # in any case we skip the VG creation step
         
@@ -279,8 +280,8 @@ def main(cmdLineargs=None):
         
             if graph_genome.split('.')[-1]!='xg' and \
                 graph_genome.split('.')[-1]!='vg':
-                code=he.throw_no_xg_and_vg_err()
-                sys.exit(code)
+                raise VGException("The genome graph must be in VG or XG format")
+                die(1)
         
             elif graph_genome.split('.')[-1]=='vg': # we are given a vg genome
                 vg=graph_genome
@@ -295,17 +296,15 @@ def main(cmdLineargs=None):
         elif args.graph_genome_dir:
             
             gplus=True # defines if the input is a single xg or more than one
-            #xg_path=''.join([graph_genome_dir, '*.xg'])
-            #xgs=glob.glob(xg_path)
             
             without_vg_pipeline(cores, graph_genome_dir, bedfile, motif, bgfile, pseudocount,
                                     pvalueT, no_reverse, dest, WITH_VG_CREATION, gplus, chroms) # add qvalue
             
     else:
         # error in the pipeline flag
-        msg="Error: wrong input. Unable to determine which pipeline to follow"
-        raise Exception(msg)
-        sys.exit(1)
+        msg="Wrong input. Unable to determine which pipeline to follow"
+        raise PipelineException(msg)
+        die(1)
         
     end=time.time()
     
