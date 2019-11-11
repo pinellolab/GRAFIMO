@@ -20,7 +20,7 @@ from . import paths_scoring as ps
 from . import vgCreation as vgc
 from . import objs_writer as ow
 
-__version__='0.6'
+__version__='0.8'
 
 def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile, 
                          pseudo, pvalueT, no_reverse, dest, pipeline):
@@ -51,7 +51,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motif, bgfile, pseudo,
     
     m=mtf.get_motif_pwm(motif, bgfile, pseudo, no_reverse)
     data=sge.get_data(graph_genome, bedfile, m.getWidth(), pipeline, gplus, 
-                          chroms, cores)
+                        chroms, cores)
     df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse)
     
     objs_towrite=[df] # initialize the list of objects to save

@@ -26,8 +26,7 @@ Citation:
     
     
 Run 'grafimo --help'to see all command-line options.
-See https://github.com/pinellolab/GRAFIMO or
-https://github.com/InfOmics/GRAFIMO for the full documentation.
+See https://github.com/InfOmics/GRAFIMO for the full documentation.
 
 """
 
