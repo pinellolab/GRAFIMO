@@ -317,7 +317,7 @@ def build_motif_JASPAR(motif_file, bg_file, pseudocount, no_reverse):
     assert pseudocount > 0
 
     # read the motif file
-    motif=read_JASPAR_motif(motif_file, bg_file, no_reverse)
+    motif=read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse)
 
     # get the log-odds matrix
     motif_log_odds=compute_log_odds(motif.getMotif_matrix(), motif.getWidth(),
@@ -382,7 +382,7 @@ def read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse):
     else:
 
         motif_counts=pd.DataFrame(data=counts, index=nucs)  # raw counts
-        motif_width=len(motif_counts.columns)
+        motif_width=int(len(motif_counts.columns))
         alphabet=sorted(nucs)
 
         if bg_file:
@@ -392,12 +392,12 @@ def read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse):
 
         bgs=pseudo_bg(bgs, no_reverse)
 
-        motif_prob=(motif_count / motif_count.sum(0))  # get probabilities
-        motif_prob=norm_motif(motif_prob, motif_width, alphabet)
-        motif_prob=apply_pseudocount_jaspar(motif_counts, motif_prob, pseudocount,
+        motif_probs=(motif_counts / motif_counts.sum(0))  # get probabilities
+        motif_probs=norm_motif(motif_probs, motif_width, alphabet)
+        motif_probs=apply_pseudocount_jaspar(motif_counts, motif_probs, pseudocount, bgs,
                                               motif_width, alphabet)
 
-        motif=Motif(motif_prob, motif_width, alphabet, motifID, motifName)
+        motif=Motif(motif_probs, motif_width, alphabet, motifID, motifName)
         motif.setBg(bgs)
 
         return motif
@@ -670,6 +670,8 @@ def pseudo_bg(bgs, no_reverse):
         
     if not no_reverse:
         bgs_avg=average_bg_with_rc(bgs)
+    else:
+        bgs_avg=bgs
         
     bgs_proc=norm_bg(bgs_avg)
 

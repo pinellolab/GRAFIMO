@@ -19,12 +19,11 @@ from . import motif as mtf
 from . import paths_scoring as ps
 from . import vgCreation as vgc
 from . import objs_writer as ow
-from grafimo.utils import printWelcomeMsg
 
 __version__='0.8'
 
 def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile, 
-                         pseudo, pvalueT, no_reverse, dest, pipeline):
+                         pseudo, pvalueT, no_reverse, qvalue, dest, pipeline):
     
     gplus=False # prevent unexpected behaviors
 
@@ -36,7 +35,7 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile,
     m=mtf.get_motif_pwm(motif, bgfile, pseudo, no_reverse) # create the motif
     data=sge.get_data(vg_loc, bedfile, m.getWidth(), pipeline, gplus, 
                           chroms, cores) # extract the region peaks
-    df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse) # scoring
+    df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse, qvalue) # scoring
     
     objs_towrite=[df] # initialize the list of objects to save
     ##TO DO: matplotlib or seaborn plots 
@@ -44,7 +43,7 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile,
     ow.writeresults(objs_towrite, dest) # write results
     
 def without_vg_pipeline(cores, graph_genome, bedfile, motif, bgfile, pseudo, 
-                            pvalueT, no_reverse, dest, pipeline, gplus=False, chroms=[]):
+                            pvalueT, no_reverse, qvalue, dest, pipeline, gplus=False, chroms=[]):
     
     printWelcomeMsg("WITHOUT_VG_CREATION")
     
@@ -53,11 +52,31 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motif, bgfile, pseudo,
     m=mtf.get_motif_pwm(motif, bgfile, pseudo, no_reverse)
     data=sge.get_data(graph_genome, bedfile, m.getWidth(), pipeline, gplus, 
                         chroms, cores)
-    df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse)
+    df=ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse, qvalue)
     
     objs_towrite=[df] # initialize the list of objects to save
     ##TO DO: matplotlib or seaborn plots 
     ##TO DO: add plots objects to objs_toWrite() 
     ow.writeresults(objs_towrite, dest)
 
-    
+def printWelcomeMsg(pipeline):
+    """
+        Prints the initial message for GRAFIMO
+        ----
+        Params:
+            pipeline (str) : chosen pipeline
+        ----
+        Returns:
+             None
+    """
+    for _ in range(35):
+        print('*', end='')
+    print()
+    print("\tWELCOME TO GRAFIMO v", __version__, sep='')
+    print()
+    print("Beginning the " + pipeline + " pipeline")
+    print()
+
+    for _ in range(35):
+        print('*', end='')
+    print('\n')

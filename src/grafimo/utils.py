@@ -136,29 +136,6 @@ def lg2(value):
     return (np.log(value)*LOG_FACTOR)
 
 
-def printWelcomeMsg(pipeline):
-    """
-        Prints the initial message for GRAFIMO
-        ----
-        Params:
-            pipeline (str) : chosen pipeline
-        ----
-        Returns:
-             None
-    """
-    for _ in range(35):
-        print('*', end='')
-    print()
-    print("\tWELCOME TO GRAFIMO v", __version__, sep='')
-    print()
-    print("Beginning the " + pipeline + " pipeline")
-    print()
-
-    for _ in range(35):
-        print('*', end='')
-    print('\n')
-
-
 def correct_path(path, path_id='', file_format=''):
 
     if path[-1:] == '/':

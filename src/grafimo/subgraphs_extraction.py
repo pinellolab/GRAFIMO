@@ -40,16 +40,10 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
         Returns:
             fileloc (str) : path to the data obtained
     """
-    
-    for _ in range(20):
-        print('#', end='')
-    print() #newline
-    print("Extracting subgraphs from regions defined in ", bedfile)
-    print()
-    for _ in range(20):
-        print('#', end='')
-    print()
-    
+
+    printSgeWelcomeMsg(bedfile)
+
+    # create a tmp working directory
     tmpwd='.grafimo'
 
     if os.path.isdir(tmpwd):
@@ -234,11 +228,11 @@ def vgc_sge(bedfile, TFBS_len, chroms):
                     die(1)
                     
             else:
-                warnings.warn('chromosome name not valid. Region skipped\n', Warning)
+                warnings.warn('chromosome name not valid. Region skipped\n', VGExtractionWarning)
                 # although we have an exception we don't stop the execution
             
     except:
-        raise FileReading("Unable to extract regions")
+        raise FileReadingException("Unable to extract regions")
         die(1)
 
     else:
@@ -307,11 +301,11 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
                     die(1)
                     
             else:
-                warnings.warn('chromosome name not valid. Region skipped\n', Warning)
+                warnings.warn('chromosome name not valid. Region skipped\n', VGExtractionWarning)
                 # although we have an exception we don't stop the execution
             
     except:
-        raise FileReading("Unable to extract regions")
+        raise FileReadingException("Unable to extract regions")
         die(1)
         
     else:
@@ -394,11 +388,10 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
                     die(1)
                     
             else:
-                warnings.warn('chromosome name not valid. Region skipped\n', Warning)
-                # although we have an exception we don't stop the execution
+                pass # ignore if not in the search space
             
     except:
-        raise FileReading("Unable to extract regions")
+        raise FileReadingException("Unable to extract regions")
         die(1)
         
     else:
@@ -497,5 +490,19 @@ def getBEDregions(bedfile):
 
     finally:
         b.close() # close the file stream
-    
-    
+
+def printSgeWelcomeMsg(bedfile):
+
+    print()
+    for _ in range(20):
+        print('#', end='')
+    print()  # newline
+    print("\nExtracting subgraphs from regions defined in ", bedfile)
+    print()
+    for _ in range(20):
+        print('#', end='')
+    print()
+
+class VGExtractionWarning(UserWarning): # used for the extraction warning handling
+    pass
+

@@ -98,7 +98,8 @@ def writeGFF3(data):
         
         for idx in data_idxs:
             
-            seqid=data.loc[idx, 'sequence_name']
+            seqname=data.loc[idx, 'sequence_name'].split(':')[0] # takes only the chromosome
+                                                                 # name
             source='grafimo'
             tp='nucleotide_motif'
             start=data.loc[idx, 'start']
@@ -111,15 +112,15 @@ def writeGFF3(data):
             motifName=data.loc[idx, 'motif_alt_id']
             pvalue=data.loc[idx, 'p-value']
             sequence=data.loc[idx, 'matched_sequence']
-            att1=''.join(['Name=', motifID, '_', seqid, strand])
+            att1=''.join(['Name=', motifID, '_', seqname, strand])
             att2=''.join(["Alias=", motifName])
-            att3=''.join(["ID=", motifID, '-', motifName, '-', seqid])
+            att3=''.join(["ID=", motifID, '-', motifName, '-', seqname])
             att4=''.join(['pvalue=', str(pvalue)])
-            att5=''.join(['sequence=', sequence])
-            atts=':'.join([att1, att2, att3, att4, att5])
+            att5=''.join(['sequence=', sequence, ';\n'])
+            atts=';'.join([att1, att2, att3, att4, att5])
         
-            gffline='\t'.join([seqid, source, tp, start, end, str(score), 
-                                   strand, phase, atts, ';\n'])
+            gffline='\t'.join([seqname, source, tp, start, end, str(score),
+                                   strand, phase, atts])
     
             f.write(gffline)
             

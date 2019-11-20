@@ -119,8 +119,8 @@ def get_uniformBG(alphabet):
     return cget_uniformBG(alphabet)
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, int width,
-                                bgs, alphabet):
+cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, bgs,
+                                    int width, alphabet):
     """
         Given the raw counts matrix (motif files in JASPAR format) apply to it the 
         pseudocount
@@ -178,8 +178,8 @@ cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, 
 
     for j in range(width):
 
-        site_counts=sum(counts_matrix[:, j])
-        total_counts=site_counts+pseudo
+        site_counts=sum(counts_matrix.loc[:, j])
+        total_counts=<double>site_counts+pseudo
 
         for nuc in alphabet:
 
