@@ -50,7 +50,7 @@ def check_cython():
 
 extensions=[
     Extension('motif_processing', sources=['src/grafimo/motif_processing.pyx']),
-    Extension('GRAFIMOscoring', sources=['src/grafimo/scoring.pyx']),
+    Extension('GRAFIMOscoring', sources=['src/grafimo/GRAFIMOscoring.pyx']),
 ]
 
 class BuildExt(be):
@@ -91,6 +91,7 @@ setup(
       install_requires=[
               'pandas~=0.24.2',
               'numpy~=1.16.4',
+              'statsmodels~=0.10.0',
               ],
       extras_require={
           'dev': ['Cython']
