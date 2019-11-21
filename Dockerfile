@@ -23,6 +23,7 @@ RUN python get-pip.py
 RUN apt-get install python3-pip -y
 RUN pip3 install pandas
 RUN pip3 install numpy
+RUN pip3 install statsmodels
 RUN pip3 install Cython
 
 # remove the pip installation file
