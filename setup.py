@@ -9,7 +9,7 @@ from distutils.version import LooseVersion
 from distutils.command.sdist import sdist as sd
 from distutils.command.build_ext import build_ext as be
 import sys
-from src.grafimo.grafimo import __version__ as grafimo_version
+#from src.grafimo.grafimo import __version__ as grafimo_version
 
 
 if sys.version_info[:2] < (3,7): # python 3.7 is required
@@ -73,10 +73,10 @@ class SDist(sd):
         super().run()
 
 # definition of setup()
-gfv=str(grafimo_version)
+#gfv=str(grafimo_version)
 setup(
       name='grafimo',
-      version=gfv,
+      version='0.8',
       author='Manuel Tognon',
       author_email='manu.tognon@gmail.com',
       url='https://github.com/InfOmics/GRAFIMO',
