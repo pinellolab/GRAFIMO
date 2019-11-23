@@ -33,7 +33,7 @@ RUN rm get-pip.py
 RUN apt-get install git -y
 
 # Download and build GRAFIMO
-RUN git clone https://github.com/InfOmics/GRAFIMO.git
+RUN git clone https://github.com/pinellolab/GRAFIMO.git
 RUN pip3 install GRAFIMO/
 
 # Set expose to port 80 and 443
