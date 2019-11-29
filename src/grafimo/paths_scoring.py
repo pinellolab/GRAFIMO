@@ -17,7 +17,7 @@ results in a pandas DataFrame
 import pandas as pd
 from . import motif as mtf
 from grafimo.GRAFIMOException import WrongPathException, ValueException, SubprocessException
-from grafimo.utils import die
+from grafimo.utils import die, printProgressBar
 from GRAFIMOscoring import score_seq
 import os
 import multiprocessing as mp
@@ -352,9 +352,9 @@ def compute_qvalues(pvalues):
 
     return qvalues
 
-
+"""
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
+    
         Print the progress bar in the sequence scoring process
         ----
         Parameters:
@@ -369,7 +369,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
         ----
         Returns
             None
-    """
+    
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
@@ -377,6 +377,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     # Print New Line on Complete
     if iteration == total:
         print()   
+"""
         
 def buildDF(motif, seqnames, starts, ends, strands, 
                 scores, pvalues, qvalues, sequences, pvalueT):
@@ -497,6 +498,20 @@ def buildDF(motif, seqnames, starts, ends, strands,
         
     # values are sorted by p-value
     df = df.sort_values(['p-value'], ascending=True)
+
+    # format score, p-value and q-value
+   # for idx in range(DFLEN):
+    #    new_score = round(df.loc[idx, 'score'], 4)
+     #   df.loc[idx, 'score'] = new_score
+
+      #  new_pvalue = np.format_float_scientific(df.loc[idx, 'p-value'],
+                                                    #precision=4)
+       # df.loc[idx, 'p-value'] = new_pvalue
+
+        #if QVAL:
+         #   new_qvalue = np.format_float_scientific(df.loc[idx, 'q-value'],
+                                                     #   precision=4)
+          #  df.loc[idx, 'q-value'] = new_qvalue
 
     df.index = list(range(1, DFLEN+1))
         

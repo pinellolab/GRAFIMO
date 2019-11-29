@@ -17,17 +17,24 @@ class GRAFIMOException(Exception):
 
     pass
 
+
+class DependencyException(GRAFIMOException):
+    """
+        raise an excepton if one of the external
+        dependendencies needed by GRAFIMO is
+        not found
+    """
+
+    pass
+
+
 class NoDataFrameException(GRAFIMOException):
     """
         Raise when a given object is not an instance of pandas.DataFrame
     """
-    def __init__(self, message):
 
-        self.message = message
+    pass
 
-    def __str__(self):
-
-        return repr(self.message)
 
 class WrongMotifWidthException(GRAFIMOException):
     """
@@ -35,13 +42,8 @@ class WrongMotifWidthException(GRAFIMOException):
         not valid width
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class WrongMotifIDException(GRAFIMOException):
     """
@@ -49,13 +51,8 @@ class WrongMotifIDException(GRAFIMOException):
         with a wrong ID
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class WrongMotifNameException(GRAFIMOException):
     """
@@ -63,26 +60,16 @@ class WrongMotifNameException(GRAFIMOException):
         with a wrong name
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class NotValidMotifMatrixException(GRAFIMOException):
     """
         Raise an exception when is given a not valid motif matrix
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class NotValidBGException(GRAFIMOException):
     """
@@ -90,26 +77,16 @@ class NotValidBGException(GRAFIMOException):
         given to the motif object
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class NotValidAlphabetException(GRAFIMOException):
     """
         Raise an exception when a not valid alphabet is given
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class NotValidFFException(GRAFIMOException):
     """
@@ -117,13 +94,8 @@ class NotValidFFException(GRAFIMOException):
         file format
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class FileReadingException(Exception):
     """
@@ -131,40 +103,25 @@ class FileReadingException(Exception):
         reading
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        return repr(self.message)
 
 class MissingFileException(GRAFIMOException):
     """
         Raise an exception when a file is missing
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class ValueException(GRAFIMOException):
     """
         Raise an exception when a wrong value type is given to
         a function
     """
+    
+    pass
 
-    def __init__(self, message):
-
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class ScaledScoreMatrixException(GRAFIMOException):
     """
@@ -172,26 +129,16 @@ class ScaledScoreMatrixException(GRAFIMOException):
         score matrix of the motif
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class WrongPathException(GRAFIMOException):
     """
         Raise an exception if is given a wrong path
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class SubprocessException(GRAFIMOException):
     """
@@ -199,26 +146,16 @@ class SubprocessException(GRAFIMOException):
         different from 0
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class VGException(GRAFIMOException):
     """
         Raise an exception for errors regarding vg tool
     """
 
-    def __init__(self, message):
+    pass
 
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
 
 class PipelineException(GRAFIMOException):
     """
@@ -226,11 +163,4 @@ class PipelineException(GRAFIMOException):
         pipeline choice or initialization
     """
 
-    def __init__(self, message):
-
-        self.message = message
-
-    def __str__(self):
-
-        repr(self.message)
-
+    pass

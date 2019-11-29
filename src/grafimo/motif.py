@@ -643,7 +643,7 @@ def get_motif_pwm(motif_file, bgs, pseudo, no_reverse):
         motif=build_motif_MEME(motif_file, bgs, pseudo, no_reverse)
 
     else:
-        msg=' '.join["Do not know what to do with file", motif_file]
+        msg=' '.join(["Do not know what to do with file", motif_file])
         raise NotValidFFException(msg)
         die(1)
 

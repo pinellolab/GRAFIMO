@@ -14,7 +14,7 @@ import subprocess
 import warnings
 from grafimo.GRAFIMOException import SubprocessException, NotValidFFException, FileReadingException, VGException, \
                                         PipelineException, ValueException
-from grafimo.utils import die, correct_path, CHROMS_LIST
+from grafimo.utils import die, correct_path, CHROMS_LIST, printProgressBar
 import sys
 import os
 import numpy as np
@@ -22,7 +22,7 @@ import multiprocessing as mp
 
 
 def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, 
-                 chroms, ncores):
+                 chroms, ncores, verbose = False):
     """
         returns the data necessary for the following steps of the analysis 
         pipeline
@@ -76,7 +76,7 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
             
             for i in range(NCORES):
                 p=mp.Process(target=vgc_sge, args=(bedregions_splt[i], 
-                                                       TFBS_len, chroms))
+                                                       TFBS_len, chroms, verbose))
                 jobs.append(p)
                 p.start()
                 
@@ -89,7 +89,7 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
                 for i in range(NCORES):
                     p=mp.Process(target=no_vgc_sge_gplus, 
                                      args=(genome_loc, bedregions_splt[i], 
-                                               TFBS_len, chroms))
+                                               TFBS_len, chroms, verbose))
                     jobs.append(p)
                     p.start()
                     
@@ -105,7 +105,7 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
                 for i in range(NCORES):
                     p=mp.Process(target=no_vgc_sge, 
                                      args=(genome_loc, bedregions_splt[i],
-                                               TFBS_len))
+                                               TFBS_len, verbose))
                     jobs.append(p)
                     p.start()
                     
@@ -156,7 +156,7 @@ def get_xg_loc(toXGpath):
     
     return toXGpath
 
-def vgc_sge(bedfile, TFBS_len, chroms):
+def vgc_sge(bedfile, TFBS_len, chroms, verbose):
     """
         Extract the subgraphs from the genome graph and the sequences to score
         from them (step to follow in the pipeline with the vg creation)
@@ -176,52 +176,78 @@ def vgc_sge(bedfile, TFBS_len, chroms):
 
         # look at user defined chromosomes
         if chroms:
-            CHR_LIST=[''.join(['chr', c]) for c in chroms]
+            CHR_LIST = [''.join(['chr', c]) for c in chroms]
 
         # look at all chromosomes
         else:
-            CHR_LIST=[''.join(['chr', c]) for c in CHROMS_LIST]
+            CHR_LIST = [''.join(['chr', c]) for c in CHROMS_LIST]
         
         for line in bedfile:
             chrom, start, end = line.split('\t')[0:3]
             #chromid=chrom.replace('chr', '')
             
             if chrom in CHR_LIST: # chromosome name is valid
-                region_index=chrom+':'+start+'-'+end
-                print('Extracting region:', region_index)
+                region_index = chrom+':'+start+'-'+end
+                if verbose:
+                    print('Extracting region:', region_index)
             
-                path_id=chrom+'_'+start+'-'+end
-                subgraph_path=correct_path('./', path_id, '.vg')
+                path_id = chrom+'_'+start+'-'+end
+                subgraph_path = correct_path('./', path_id, '.vg')
             
-                vg=''.join(['../', chrom, '.xg']) # for extraction is required the xg
+                vg = ''.join(['../', chrom, '.xg']) # for extraction is required the xg
                 
-                code=extract_region(vg, region_index, subgraph_path)
+                code = extract_region(vg, region_index, subgraph_path)
             
                 if code != 0:
-                    warn="Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
+                    warn = "Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
                     warnings.warn(warn, Warning)  # although we have an exception we don't stop the execution
                     
                 else:
-                    # write on the stderr
-                    msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
-                    sys.stderr.write(msg) 
+                   
+                    if verbose:
+                        # write on the stderr
+                        msg = "Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
+                        sys.stderr.write(msg) 
                 
-                kmer_path=correct_path('./', path_id, '.tsv')
+                kmer_path = correct_path('./', path_id, '.tsv')
                 
+                # if was not possible to extract the region we go to the next one
+                if os.stat(subgraph_path).st_size <= 0:
+
+                    cmd = 'rm {0}'.format(subgraph_path) # remove the subgraph
+                    code = subprocess.call(cmd, shell=True)
+            
+                    if code != 0:
+                        raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
+                        die(1)
+                    
+                    continue
+
                 # vg kmer works with vg not xg graphs
-                code=retrieve_kmers(TFBS_len, subgraph_path, kmer_path)
+                code = retrieve_kmers(TFBS_len, subgraph_path, kmer_path)
             
                 if code != 0:
-                    warn="Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
+                    warn = "Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
                     warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
+
+                    # remove the empty file
+                    cmd = "rm {0}".format(kmer_path)
+                    code = subprocess.call(cmd, shell=True)
+
+                    if code != 0:
+                        msg = "An error was encountered executing {0}".format(cmd)
+                        raise SubprocessException(msg)
+                        die(1)
                     
                 else:
-                    # write on the stderr
-                    msg="Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
-                    sys.stderr.write(msg)
+
+                    if verbose:
+                        # write on the stderr
+                        msg = "Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
+                        sys.stderr.write(msg)
                 
-                cmd='rm {0}'.format(subgraph_path)
-                code=subprocess.call(cmd, shell=True)
+                cmd = 'rm {0}'.format(subgraph_path)
+                code = subprocess.call(cmd, shell=True)
             
                 if code != 0:
                     raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
@@ -287,6 +313,15 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
                 if code != 0:
                     warn="Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
                     warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
+
+                    # remove the empty file
+                    cmd = "rm {0}".format(kmer_path)
+                    code = subprocess.call(cmd, shell=True)
+
+                    if code != 0:
+                        msg = "An error was encountered executing {0}".format(cmd)
+                        raise SubprocessException(msg)
+                        die(1)
                     
                 else:
                     # write on the stderr
@@ -374,6 +409,15 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
                 if code != 0:
                     warn="Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
                     warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
+
+                    # remove the empty file
+                    cmd = "rm {0}".format(kmer_path)
+                    code = subprocess.call(cmd, shell=True)
+
+                    if code != 0:
+                        msg = "An error was encountered executing {0}".format(cmd)
+                        raise SubprocessException(msg)
+                        die(1)
                     
                 else:
                     # write on the stderr

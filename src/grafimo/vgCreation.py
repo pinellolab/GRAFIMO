@@ -16,7 +16,7 @@ import subprocess
 import os
 import glob
 from grafimo.utils import CHROMS_LIST, die
-from grafimo.GRAFIMOException import VGException, ValueException
+from grafimo.GRAFIMOException import VGException, ValueException, SubprocessException
 
 def get_genome_from_ucsc():
     """
