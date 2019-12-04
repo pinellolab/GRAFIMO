@@ -32,7 +32,7 @@ CTCF=`ls MA0139.1.jaspar`
 bg=`ls bg_nt`
 
 # run the example
-grafimo --graph_genome_dir ./ --chroms 22 --bedfile $bed --motif $CTCF --bgfile $bg --pseudo 0.1 --pvalueT 1e-3
+grafimo -d ./ --chroms 22 --bedfile $bed --motif $CTCF --bgfile $bg --pseudo 0.1 
 
 # What did we do?
 #
