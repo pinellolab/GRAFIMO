@@ -46,7 +46,6 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
 
     # create a tmp working directory
     tmpwd = tempfile.mkdtemp(prefix = 'grafimo_')
-    print(tmpwd)
 
     #if the tmp directory name already exists remove it
     if os.path.isdir(tmpwd):
@@ -89,7 +88,7 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
                 
             for job in jobs:
                 proc_finished += 1
-                printProgressBar(proc_finished, N_CORES, prefix='Progress:',
+                printProgressBar(proc_finished, NCORES, prefix='Progress:',
                                     suffix='Complete', length=100)
                 job.join() # deadlock
         
