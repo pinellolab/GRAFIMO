@@ -38,7 +38,7 @@ bg=`ls bg_nt`
 
 
 # run the test
-grafimo --linear_genome $chr22 --chroms 22 --vcf $variants --bedfile $bed --motif $CTCF --bgfile $bg --pseudo 0.1 --pvalueT 1e-3
+grafimo -l $chr22 -c 22 -v $variants --bedfile $bed --motif $CTCF --bgfile $bg --pseudo 0.1 --pvalueT 1e-3
 
 # What we did?
 #
