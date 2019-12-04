@@ -221,7 +221,7 @@ def vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
                 path_id = chrom+'_'+start+'-'+end
                 subgraph_path = correct_path('./', path_id, '.vg')
             
-                vg = ''.join([cwd, '/', xg, chrom, '.xg']) # for extraction is required the xg
+                vg = ''.join([xg, chrom, '.xg']) # for extraction is required the xg
                 
                 code = extract_region(vg, region_index, subgraph_path)
             
