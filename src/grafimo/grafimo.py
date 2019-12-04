@@ -20,6 +20,7 @@ from . import paths_scoring as ps
 from . import vgCreation as vgc
 from . import objs_writer as ow
 import sys
+import os
 
 __version__='0.8'
 

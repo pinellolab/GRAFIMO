@@ -1,3 +1,5 @@
+# cython: profile=False, emit_code_comments=False, language_level=3
+
 """
 
 @author: Manuel Tognon

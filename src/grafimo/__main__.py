@@ -41,6 +41,7 @@ from grafimo.GRAFIMOException import DependencyException, VGException, PipelineE
 from grafimo.utils import die, check_deps, EXT_DEPS
 import time
 import sys
+import os
 import glob
 import multiprocessing as mp
 import grafimo.vgCreation as vgc
@@ -93,7 +94,10 @@ def get_AP():
     group.add_argument("-h", "--help", action="help", help="Show the help message and exit")
     group.add_argument("--version", action="version", help="Show the version and exit", version=__version__)
     group.add_argument("--cores", type=int, default=0, metavar="NCORES", nargs='?', const=0,
-                           help="Number of cores to use. The default value is %(default)s (auto-detection)")
+                           help="Number of cores to use. The default value is %(default)s (auto-detection)."
+                                "If you chose to query the whole genome variation graph note that the default "
+                                "option is to use only one core to avoid memory issues; if you are running "
+                                "GRAFIMO on a machine with RAM >= 128 GB maybe you can use more cores")
     
     # the following arguments depend on the user approach
     group.add_argument("-l", "--linear-genome", type=str, help='Path to the linear genome (fasta format required)',
@@ -332,12 +336,17 @@ def main(cmdLineargs = None):
     if args.out:
         dest = args.out
 
+    if dest == 'grafimo_out': # default option
+        # to make unique the output directory we add the PID
+        # to the name
+        dest = ''.join([dest, '_', str(os.getpid())])
+
     if not isinstance(args.verbose, bool) and args.verbose != False \
         and args.verbose != True:
-        parser.error('The --verbose paramter accepts only True or False values')
+        parser.error('The --verbose parameter accepts only True or False values')
 
     else:
-        verbose = args.verbose
+        verbose = bool(args.verbose)
 
     # checking that external dependencies are satisfied 
     if verbose:
@@ -362,7 +371,7 @@ def main(cmdLineargs = None):
 
     if WITH_VG_CREATION:
             
-        dest += '/'
+        dest = ''.join([dest, '/'])
         
         if verbose:
             print("\nEntering the pipeline with the variation graph creation\n")
@@ -372,6 +381,9 @@ def main(cmdLineargs = None):
         
         
     elif not WITH_VG_CREATION:
+
+        if verbose:
+            print("\nEntering the pipeline without the variation graph creation\n")
         
         if args.graph_genome:
         
@@ -387,8 +399,8 @@ def main(cmdLineargs = None):
             else: # we are given an xg genome
                 xg = graph_genome
 
-            print("\nEntering the pipeline without the variation graph creation")
-            print("The graph " + xg + " will be queried\n")
+            if verbose:
+                print("The graph " + xg + " will be queried\n")
         
             without_vg_pipeline(cores, xg, bedfile, motif, bgfile, pseudocount, 
                                     pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION)
@@ -397,8 +409,8 @@ def main(cmdLineargs = None):
             
             gplus=True # defines if the input is a single xg or more than one
 
-            print("\nEntering the pipeline without the variation graph creation")
-            print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
+            if verbose:
+                print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
             
             without_vg_pipeline(cores, graph_genome_dir, bedfile, motif, bgfile, pseudocount,
                                     pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION, gplus, chroms)

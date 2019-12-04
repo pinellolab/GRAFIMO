@@ -19,6 +19,7 @@ import sys
 import os
 import numpy as np
 import multiprocessing as mp
+import tempfile
 
 
 def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus, 
@@ -44,8 +45,10 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
     printSgeWelcomeMsg(bedfile)
 
     # create a tmp working directory
-    tmpwd='.grafimo'
+    tmpwd = tempfile.mkdtemp(prefix = 'grafimo_')
+    print(tmpwd)
 
+    #if the tmp directory name already exists remove it
     if os.path.isdir(tmpwd):
         cmd='rm -rf {0}'.format(tmpwd)
         code=subprocess.call(cmd, shell=True)
@@ -54,33 +57,40 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
             raise SubprocessException(' '.join(["an error occurred executing", cmd, ". Exiting"]))
             die(1)
 
-    cmd='mkdir -p {0}'.format(tmpwd)
-    code=subprocess.call(cmd, shell=True)
-    if code!=0:
+    cmd = 'mkdir -p {0}'.format(tmpwd)
+    code = subprocess.call(cmd, shell=True)
+    if code != 0:
         raise SubprocessException(' '.join(["an error occurred executing", cmd, ". Exiting"]))
         die(1)
     
     try:
         
-        NCORES=ncores
-        bedregions=getBEDregions(bedfile)
+        NCORES = ncores
+        bedregions = getBEDregions(bedfile)
         
         # prepare for parellelization
-        jobs=[]
-        bedregions_splt=np.array_split(bedregions, NCORES)
+        jobs = []
+        proc_finished = 0
+        bedregions_splt = np.array_split(bedregions, NCORES)
         
-        cwd=os.getcwd()
+        cwd = os.getcwd()
         os.chdir(tmpwd)
         
         if vg_creation_pipeline:
             
             for i in range(NCORES):
-                p=mp.Process(target=vgc_sge, args=(bedregions_splt[i], 
-                                                       TFBS_len, chroms, verbose))
+                p=mp.Process(target=vgc_sge, args=(genome_loc, bedregions_splt[i], 
+                                                       TFBS_len, chroms, verbose,cwd))
                 jobs.append(p)
                 p.start()
+
+            printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                                        suffix='Complete', length=100)
                 
             for job in jobs:
+                proc_finished += 1
+                printProgressBar(proc_finished, N_CORES, prefix='Progress:',
+                                    suffix='Complete', length=100)
                 job.join() # deadlock
         
         elif not vg_creation_pipeline:
@@ -89,11 +99,17 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
                 for i in range(NCORES):
                     p=mp.Process(target=no_vgc_sge_gplus, 
                                      args=(genome_loc, bedregions_splt[i], 
-                                               TFBS_len, chroms, verbose))
+                                               TFBS_len, chroms, verbose, cwd))
                     jobs.append(p)
                     p.start()
+
+                printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                                        suffix='Complete', length=100)
                     
                 for job in jobs:
+                    proc_finished += 1
+                    printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                                        suffix='Complete', length=100)
                     job.join() # deadlock
         
             else:
@@ -105,11 +121,17 @@ def get_data(genome_loc, bedfile, TFBS_len, vg_creation_pipeline, gplus,
                 for i in range(NCORES):
                     p=mp.Process(target=no_vgc_sge, 
                                      args=(genome_loc, bedregions_splt[i],
-                                               TFBS_len, verbose))
+                                               TFBS_len, verbose, cwd))
                     jobs.append(p)
                     p.start()
+
+                printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                                        suffix='Complete', length=100)
                     
                 for job in jobs:
+                    proc_finished += 1
+                    printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                                        suffix='Complete', length=100)
                     job.join() # deadlock
             
         else:
@@ -148,20 +170,21 @@ def get_xg_loc(toXGpath):
     """
     
     for i in range(1, len(toXGpath)):
-        if toXGpath[-i]=='/':
-            bp=-i
+        if toXGpath[-i] == '/':
+            bp = -i
             break
         
-    toXGpath=toXGpath[:bp]
+    toXGpath = toXGpath[:bp]
     
     return toXGpath
 
-def vgc_sge(bedfile, TFBS_len, chroms, verbose):
+def vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
     """
         Extract the subgraphs from the genome graph and the sequences to score
         from them (step to follow in the pipeline with the vg creation)
         ----
         Parameters:
+            xg (str) : path to the genome graph location
             bedfile (list) : slice of regions to extract
             TFBS_len (int) : motif width
             chroms (list) : list of chromosomes to take into account during the
@@ -171,6 +194,10 @@ def vgc_sge(bedfile, TFBS_len, chroms, verbose):
             None
     """
     
+    if xg[-1] == "/":
+        pass
+    else:
+        xg = ''.join([xg, "/"])
     
     try:
 
@@ -194,7 +221,7 @@ def vgc_sge(bedfile, TFBS_len, chroms, verbose):
                 path_id = chrom+'_'+start+'-'+end
                 subgraph_path = correct_path('./', path_id, '.vg')
             
-                vg = ''.join(['../', chrom, '.xg']) # for extraction is required the xg
+                vg = ''.join([cwd, '/', xg, chrom, '.xg']) # for extraction is required the xg
                 
                 code = extract_region(vg, region_index, subgraph_path)
             
@@ -265,19 +292,23 @@ def vgc_sge(bedfile, TFBS_len, chroms, verbose):
         pass
         
 
-def no_vgc_sge(xg, bedfile, TFBS_len):
+def no_vgc_sge(xg, bedfile, TFBS_len, verbose, cwd):
     """
         Extract the subgraphs from the genome graph and the sequences to score
         from them (step to follow in the pipeline without the vg creation)
         ----
         Parameters:
+            xg (str) : path to the genome graph
             bedfile (str) : path to the bedfile
             TFBS_len (int) : motif width
         ----
         Returns:
             None
     """
-
+    if xg[0:6] == '/Users':
+        pass
+    else:
+        xg = '/'.join([cwd, xg])
     
     try:
         
@@ -289,7 +320,9 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
             
             if chrom in CHR_LIST: # chromosome name is valid
                 region_index=chrom+':'+start+'-'+end
-                print("Extracting region:", region_index)
+                
+                if verbose:
+                    print("Extracting region:", region_index)
             
                 path_id=chrom+'_'+start+'-'+end
                 subgraph_path=correct_path('./', path_id, '.vg')
@@ -301,9 +334,10 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
                     warnings.warn(warn, Warning)  # although we have an exception we don't stop the execution
                     
                 else:
-                    # write to stderr
-                    msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
-                    sys.stderr.write(msg) 
+                    if verbose:
+                        # write to stderr
+                        msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
+                        sys.stderr.write(msg) 
                 
                 kmer_path=correct_path('../', path_id, '.tsv')
                 
@@ -324,9 +358,10 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
                         die(1)
                     
                 else:
-                    # write on the stderr
-                    msg="Kmers extraction for region "+chrom+':['+start+'-'+end+'] '+"finished\n"
-                    sys.stderr.write(msg)
+                    if verbose:
+                        # write on the stderr
+                        msg="Kmers extraction for region "+chrom+':['+start+'-'+end+'] '+"finished\n"
+                        sys.stderr.write(msg)
                 
                 cmd='rm {0}'.format(subgraph_path)
                 code=subprocess.call(cmd, shell=True)
@@ -346,7 +381,7 @@ def no_vgc_sge(xg, bedfile, TFBS_len):
     else:
         pass
 
-def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
+def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms, verbose, cwd):
     """
         Extract the subgraphs from the selected chromosomes and
         the sequences to score from them (step to follow in the
@@ -367,7 +402,7 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
     if xg[0:6]=='/Users':
         pass
     else:
-        xg=''.join(['../', xg])
+        xg=''.join([cwd, '/', xg])
     
     try:
         
@@ -383,7 +418,9 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
             
             if chrom in CHR_LIST: # chromosome name is valid
                 region_index=chrom+':'+start+'-'+end
-                print('Extracting region:', region_index)
+                
+                if verbose:
+                    print('Extracting region:', region_index)
             
                 path_id=chrom+'_'+start+'-'+end
                 subgraph_path=correct_path('./', path_id, '.vg')
@@ -397,9 +434,10 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
                     warnings.warn(warn, Warning)  # although we have an exception we don't stop the execution
                     
                 else:
-                    # write on the stderr
-                    msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
-                    sys.stderr.write(msg) 
+                    if verbose:
+                        # write on the stderr
+                        msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
+                        sys.stderr.write(msg) 
                 
                 kmer_path=correct_path('./', path_id, '.tsv')
                     
@@ -420,9 +458,10 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms):
                         die(1)
                     
                 else:
-                    # write on the stderr
-                    msg="Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
-                    sys.stderr.write(msg)
+                    if verbose:
+                        # write on the stderr
+                        msg="Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
+                        sys.stderr.write(msg)
                 
                 cmd='rm {0}'.format(subgraph_path)
                 code=subprocess.call(cmd, shell=True)
@@ -489,7 +528,7 @@ def isGraph_genome_xg(graph_genome):
     """
     
     if not isinstance(graph_genome, str):
-        raise Value("Invalid path to the genome graph. Cannot proceed")
+        raise VGException("Invalid path to the genome graph. Cannot proceed")
         die(1)
 
     if graph_genome.split('.')[-1] == 'xg':
