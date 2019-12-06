@@ -11,9 +11,6 @@ results in a pandas DataFrame
 
 """
 
-#### add scanned sequences
-#### add scanned positions
-
 import pandas as pd
 from . import motif as mtf
 from grafimo.GRAFIMOException import WrongPathException, ValueException, SubprocessException
@@ -70,35 +67,36 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     scoringPathsMsg(no_reverse, motif)
         
     if cores==0:
-        N_CORES=mp.cpu_count()
+        NCORES=mp.cpu_count()
     else:
-        N_CORES=cores
+        NCORES=cores
 
-    assert N_CORES > 0
+    assert NCORES > 0
         
     cwd=os.getcwd()
     os.chdir(subgraphs)
         
     manager = mp.Manager()
     returnDict = manager.dict() # results
-    seenNucsDict = manager.dict() # nucleotides seen
-    seenSeqsDict = manager.dict() # sequences seen
+    scannedNucsDict = manager.dict() # nucleotides scanned
+    scannedSeqsDict = manager.dict() # sequences scanned
         
     sgs=glob.glob('*.tsv')
-    sgs_splt=np.array_split(sgs, N_CORES)
+    print(len(sgs))
+    sgs_splt=np.array_split(sgs, NCORES)
     jobs=[]
     proc_finished=0
 
     # run the processes in parallel
-    for i in range(N_CORES):
+    for i in range(NCORES):
         p=mp.Process(target=score_subgraphs, args=(sgs_splt[i], motif, no_reverse, i, returnDict,
-                                                    seenSeqsDict, seenNucsDict))
+                                                    scannedSeqsDict, scannedNucsDict))
         jobs.append(p)
         p.start() # start the process
             
     for job in jobs:
         proc_finished += 1
-        printProgressBar(proc_finished, N_CORES, prefix='Progress:',
+        printProgressBar(proc_finished, NCORES, prefix='Progress:',
                             suffix='Complete', length=100)
         job.join() # deadlock
             
@@ -132,23 +130,23 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         pvalues += returnDict[key]['pvalue'].to_list()
         strands += returnDict[key]['strand'].to_list()
 
-    # get the total sequences seen
-    seqsSeen = 0
-    for key in seenSeqsDict.keys():
-        seqsSeen += seenSeqsDict[key]
+    # get the total sequences scanned
+    seqsScanned = 0
+    for key in scannedSeqsDict.keys():
+        seqsScanned += scannedSeqsDict[key]
 
-    # get the total nucleotides seen
-    nucsSeen = 0
-    for key in seenNucsDict.keys():
-        nucsSeen += seenNucsDict[key]
+    # get the total nucleotides scanned
+    nucsScanned = 0
+    for key in scannedNucsDict.keys():
+        nucsScanned += scannedNucsDict[key]
 
     # compute the q-values
     qvalues = []
     if qvalue:
         qvalues = compute_qvalues(pvalues)
 
-    print("\nSeen sequences:", seqsSeen)
-    print("Seen nucleotides:", nucsSeen)
+    print("\nScanned sequences:", seqsScanned)
+    print("Scanned nucleotides:", nucsScanned)
             
     finaldf = buildDF(motif, seqnames, starts, ends, strands, scores,
                         pvalues, qvalues, seqs, pvalueT)
@@ -166,27 +164,36 @@ def get_subgraphs_dict(sgs):
         Returns:
             sg_seqs_dict (dict) : dictionary of all the sequences
             sg_directions_dict (dict) : direction of each sequence
+            sg_starts_dict (dict) : starting positions of the sequences
+            sg_ends_dict (dict) : ending positions of the sequences
     """
     
-    sg_seqs_dict={} # sequences
-    sg_directions_dict={} # direction (forward/reverse)
+    sg_seqs_dict = {} # sequences
+    sg_directions_dict = {} # direction (forward/reverse)
+    sg_starts_dict = {} # starting positions
+    sg_ends_dict = {} # ending positions
    
     for sg in sgs:
-        sg_name=sg.split('.')[0]
-        sg_data=pd.read_csv(sg, header=None, sep='\t')
-        sg_seqs_dict.update({sg_name:sg_data.loc[:,0].to_list()})
-        seq_directions=get_paths_directions(sg_data)
-            
-        sg_directions_dict.update({sg_name:seq_directions})
+        sg_name = sg.split('.')[0]
+        sg_data = pd.read_csv(sg, header=None, sep='\t')
+        sg_seqs_dict.update({sg_name : sg_data.loc[:,1].to_list()})
         
-    return sg_seqs_dict, sg_directions_dict
+        seq_directions = get_paths_directions(sg_data)
+        sg_directions_dict.update({sg_name : seq_directions})
+
+        starts, ends = get_paths_positions(sg_data)
+        sg_starts_dict.update({sg_name : starts})
+        sg_ends_dict.update({sg_name : ends})
+        
+    return sg_seqs_dict, sg_directions_dict, \
+                sg_starts_dict, sg_ends_dict
 
 
 def get_paths_directions(paths):
     
     paths_num=len(paths.index)
     directions=allocate_array(None, paths_num)
-    seq_dir_list=paths.loc[:,1].to_list() # retrieve the direction field
+    seq_dir_list=paths.loc[:,2].to_list() # retrieve the direction field
     
     
     for i in range(paths_num):
@@ -201,6 +208,28 @@ def get_paths_directions(paths):
     return directions
 
 
+def get_paths_positions(paths):
+
+    paths_num = len(paths.index)
+    starts = allocate_array(None, paths_num)
+    ends = allocate_array(None, paths_num)
+    seq_start_list = paths.loc[:, 2].to_list() # retrieve starts
+    seq_end_list = paths.loc[:, 3].to_list() # retrieve ends
+
+    for i in range(paths_num):
+        # get start
+        seq_start = seq_start_list[i].split(':')[1] 
+        seq_start = seq_start[:-1]
+        starts[i] = seq_start
+
+        #get end
+        seq_end = seq_end_list[i].split(':')[1]
+        seq_end = seq_end[:-1]
+        ends[i] = seq_end
+
+    return starts, ends
+
+
 def allocate_array(value=None, size='0'):
     
     arr = [value] * size
@@ -209,7 +238,7 @@ def allocate_array(value=None, size='0'):
     
         
 def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
-                        seenSeqsDict, seenNucsDict):
+                        scannedSeqsDict, scannedNucsDict):
     """
         Score the sequences extracted from the subgraphs
         ----
@@ -222,19 +251,19 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                             parallelization step
             returnDict (dict) : dictionary to reconstruct the output after the
                                 parallelization
-            seenSeqsDict (dict) : dictionary to keep track of the sequences seen
-            seenNucsDict (dict) : dictionary to keep track of the nucleotides seen
+            scannedSeqsDict (dict) : dictionary to keep track of the sequences scanned
+            scannedNucsDict (dict) : dictionary to keep track of the nucleotides scanned
         ----
         Returns:
             None
     """
     
-    sg_paths_dict, sg_directions_dict = get_subgraphs_dict(sgs)
+    #sg_paths_dict, sg_directions_dict, sg_starts_dict, sg_ends_dict = get_subgraphs_dict(sgs)
 
     # there is no match beetwen the two dictionaries
-    if set(sg_paths_dict.keys()) != set(sg_directions_dict.keys()):
-        raise ValueException("No match between paths and strands")
-        die(1)
+    #if set(sg_paths_dict.keys()) != set(sg_directions_dict.keys()):
+    #    raise ValueException("No match between paths and strands")
+    #    die(1)
 
     scoreMatrix = motif.getMotif_scoreMatrix()
     pval_mat = motif.getMotif_pval_mat()
@@ -252,24 +281,27 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     ends = []
     strands = []
 
-    seqsSeen = 0 # counter for the sequences seen
+    seqsScanned = 0 # counter for the sequences scanned
     
-    for key in sg_paths_dict.keys():
+    for sg in sgs:
         
-        paths = sg_paths_dict[key]
-        dirs = sg_directions_dict[key]
+        sg_data = pd.read_csv(sg, header = None, sep = '\t')
+        paths_num = len(sg_data.index)
         
-        for i in range(len(paths)):
+        for i in range(paths_num):
+            strand = sg_data.loc[i, 2][-1]
             if no_reverse:
-                if int(dirs[i]) == 0: # is forward
-                    seq = paths[i]
-                    seqname = str(key)
-                    chrom, pos = seqname.split('_')
-                    start, end = pos.split('-')
-                    seqname = chrom+':'+start+'-'+end
+                if strand == '+': # is forward
+                    seq = sg_data.loc[i, 1]
+                    seqname = sg_data.loc[i, 0]
+                    chrom = seqname.split(':')[0]
+                    start = sg_data.loc[i, 2].split(':')[1]
+                    start = start[:-1]
+                    end = sg_data.loc[i, 3].split(':')[1]
+                    end = end[:-1]
                     score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
                                                 width, offset)
-                    strand= '+' # forward strand
+                    # forward strand
 
                     seqs.append(seq)
                     scores.append(score)
@@ -280,29 +312,19 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                     starts.append(start)
                     ends.append(end)
 
-                    seqsSeen += 1
+                    seqsScanned += 1
                         
             else:
-                if int(dirs[i]) == 0: #is forward
-                    seq = paths[i]
-                    seqname = str(key)
-                    chrom, pos = seqname.split('_')
-                    start, end = pos.split('-')
-                    seqname = chrom+':'+start+'-'+end
-                    score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
-                                                width, offset)
-                    strand = '+'
-
-                elif int(dirs[i]) == 1: # is reverse
-                    seq = paths[i]
-                    seqname = str(key)
-                    chrom, pos = seqname.split('_')
-                    start, end = pos.split('-')
-                    seqname = chrom+':' + start + '-'+end
-                    score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
-                                                width, offset)
-                    strand = '-'
-
+                
+                seq = sg_data.loc[i, 1]
+                seqname = sg_data.loc[i, 0]
+                chrom = seqname.split(':')[0]
+                start = sg_data.loc[i, 2].split(':')[1]
+                start = start[:-1]
+                end = sg_data.loc[i, 3].split(':')[1]
+                end = end[:-1]
+                score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
+                                            width, offset)
                 seqs.append(seq)
                 scores.append(score)
                 pvalues.append(pvalue)
@@ -312,8 +334,9 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                 starts.append(start)
                 ends.append(end)
 
-                seqsSeen += 1
-                    
+                seqsScanned += 1
+
+                                   
     summary = pd.DataFrame()
     summary['sequence_name'] = seqnames
     summary['chromosome'] = chroms
@@ -325,8 +348,8 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     summary['strand'] = strands
     
     returnDict[psid] = summary
-    seenSeqsDict[psid] = seqsSeen
-    seenNucsDict[psid] = seqsSeen * motif.getWidth() # in every sequence we have seen motif_width nucleotides
+    scannedSeqsDict[psid] = seqsScanned
+    scannedNucsDict[psid] = seqsScanned * motif.getWidth() # in every sequence we have scanned motif_width nucleotides
 
 
 def compute_qvalues(pvalues):

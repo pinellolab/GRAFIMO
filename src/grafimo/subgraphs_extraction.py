@@ -213,16 +213,16 @@ def vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
             #chromid=chrom.replace('chr', '')
             
             if chrom in CHR_LIST: # chromosome name is valid
-                region_index = chrom+':'+start+'-'+end
+                region_index = chrom + ':' + start + '-' + end
                 if verbose:
                     print('Extracting region:', region_index)
             
-                path_id = chrom+'_'+start+'-'+end
-                subgraph_path = correct_path('./', path_id, '.vg')
+                path_id = chrom + '_' + start + '-' + end
+                kmers_file = correct_path('./', path_id, '.tsv')
             
                 vg = ''.join([xg, chrom, '.xg']) # for extraction is required the xg
                 
-                code = extract_region(vg, region_index, subgraph_path)
+                code = get_kmers(vg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
                     warn = "Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
@@ -235,12 +235,10 @@ def vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
                         msg = "Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
                         sys.stderr.write(msg) 
                 
-                kmer_path = correct_path('./', path_id, '.tsv')
-                
                 # if was not possible to extract the region we go to the next one
-                if os.stat(subgraph_path).st_size <= 0:
+                if os.stat(kmers_file).st_size <= 0:
 
-                    cmd = 'rm {0}'.format(subgraph_path) # remove the subgraph
+                    cmd = 'rm {0}'.format(kmers_file) # remove the empty file 
                     code = subprocess.call(cmd, shell=True)
             
                     if code != 0:
@@ -248,36 +246,6 @@ def vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
                         die(1)
                     
                     continue
-
-                # vg kmer works with vg not xg graphs
-                code = retrieve_kmers(TFBS_len, subgraph_path, kmer_path)
-            
-                if code != 0:
-                    warn = "Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
-                    warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
-
-                    # remove the empty file
-                    cmd = "rm {0}".format(kmer_path)
-                    code = subprocess.call(cmd, shell=True)
-
-                    if code != 0:
-                        msg = "An error was encountered executing {0}".format(cmd)
-                        raise SubprocessException(msg)
-                        die(1)
-                    
-                else:
-
-                    if verbose:
-                        # write on the stderr
-                        msg = "Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
-                        sys.stderr.write(msg)
-                
-                cmd = 'rm {0}'.format(subgraph_path)
-                code = subprocess.call(cmd, shell=True)
-            
-                if code != 0:
-                    raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
-                    die(1)
                     
             else:
                 warnings.warn('chromosome name not valid. Region skipped\n', VGExtractionWarning)
@@ -318,56 +286,37 @@ def no_vgc_sge(xg, bedfile, TFBS_len, verbose, cwd):
             chrom, start, end = line.split('\t')[0:3]
             
             if chrom in CHR_LIST: # chromosome name is valid
-                region_index=chrom+':'+start+'-'+end
+                region_index = chrom + ':' + start + '-' + end
                 
                 if verbose:
                     print("Extracting region:", region_index)
             
-                path_id=chrom+'_'+start+'-'+end
-                subgraph_path=correct_path('./', path_id, '.vg')
+                path_id = chrom + '_' + start + '-' + end
+                kmers_file = correct_path('./', path_id, '.tsv')
                 
-                code=extract_region(xg, region_index, subgraph_path)
+                code = get_kmers(xg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
-                    warn="Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
+                    warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
                     warnings.warn(warn, Warning)  # although we have an exception we don't stop the execution
                     
                 else:
                     if verbose:
                         # write to stderr
-                        msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
+                        msg = "Region " + chrom + ':[' + start + '-' + end + ']' + " extracted\n"
                         sys.stderr.write(msg) 
-                
-                kmer_path=correct_path('../', path_id, '.tsv')
-                
-                # vg kmer works with vg not xg graphs
-                code=retrieve_kmers(TFBS_len, subgraph_path, kmer_path)
-            
-                if code != 0:
-                    warn="Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
-                    warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
 
-                    # remove the empty file
-                    cmd = "rm {0}".format(kmer_path)
+                # if was not possible to extract the region we go to the next one
+                if os.stat(kmers_file).st_size <= 0:
+
+                    cmd = 'rm {0}'.format(kmers_file) # remove the empty file 
                     code = subprocess.call(cmd, shell=True)
-
+            
                     if code != 0:
-                        msg = "An error was encountered executing {0}".format(cmd)
-                        raise SubprocessException(msg)
+                        raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
                         die(1)
                     
-                else:
-                    if verbose:
-                        # write on the stderr
-                        msg="Kmers extraction for region "+chrom+':['+start+'-'+end+'] '+"finished\n"
-                        sys.stderr.write(msg)
-                
-                cmd='rm {0}'.format(subgraph_path)
-                code=subprocess.call(cmd, shell=True)
-            
-                if code != 0:
-                    raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
-                    die(1)
+                    continue
                     
             else:
                 warnings.warn('chromosome name not valid. Region skipped\n', VGExtractionWarning)
@@ -398,38 +347,38 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms, verbose, cwd):
     """
         
     # check the path to xgs
-    if xg[0:6]=='/Users':
+    if xg[0:6] == '/Users':
         pass
     else:
-        xg=''.join([cwd, '/', xg])
+        xg = ''.join([cwd, '/', xg])
     
     try:
         
         if chroms:
-            CHR_LIST=[''.join(['chr', c]) for c in chroms]
+            CHR_LIST = [''.join(['chr', c]) for c in chroms]
             
         else:
-            CHR_LIST=[''.join(['chr', c]) for c in CHROMS_LIST]
+            CHR_LIST = [''.join(['chr', c]) for c in CHROMS_LIST]
         
         for line in bedfile:
 
             chrom, start, end = line.split('\t')[0:3]
             
             if chrom in CHR_LIST: # chromosome name is valid
-                region_index=chrom+':'+start+'-'+end
+                region_index = chrom + ':' + start + '-' + end
                 
                 if verbose:
                     print('Extracting region:', region_index)
             
-                path_id=chrom+'_'+start+'-'+end
-                subgraph_path=correct_path('./', path_id, '.vg')
+                path_id = chrom + '_' + start + '-' + end
+                kmers_file = correct_path('./', path_id, '.tsv')
                 
-                vg=''.join([xg, chrom, '.xg']) # for extraction is required the xg
+                vg = ''.join([xg, chrom, '.xg']) # for extraction is required the xg
                     
-                code=extract_region(vg, region_index, subgraph_path)
+                code = get_kmers(vg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
-                    warn="Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
+                    warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
                     warnings.warn(warn, Warning)  # although we have an exception we don't stop the execution
                     
                 else:
@@ -437,38 +386,19 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms, verbose, cwd):
                         # write on the stderr
                         msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
                         sys.stderr.write(msg) 
-                
-                kmer_path=correct_path('./', path_id, '.tsv')
-                    
-                # vg kmer works with vg not xg graphs
-                code=retrieve_kmers(TFBS_len, subgraph_path, kmer_path)
-                    
-                if code != 0:
-                    warn="Kmers extraction from region "+chrom+':'+'['+start+'-'+end+']'+" failed!\n"
-                    warnings.warn(warn, Warning) # although we have an exception we don't stop the execution
 
-                    # remove the empty file
-                    cmd = "rm {0}".format(kmer_path)
+                # if was not possible to extract the region we go to the next one
+                if os.stat(kmers_file).st_size <= 0:
+
+                    cmd = 'rm {0}'.format(kmers_file) # remove the empty file 
                     code = subprocess.call(cmd, shell=True)
-
+            
                     if code != 0:
-                        msg = "An error was encountered executing {0}".format(cmd)
-                        raise SubprocessException(msg)
+                        raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
                         die(1)
                     
-                else:
-                    if verbose:
-                        # write on the stderr
-                        msg="Kmers extraction for region "+chrom+':['+start+'-'+end+']'+" finished\n"
-                        sys.stderr.write(msg)
+                    continue
                 
-                cmd='rm {0}'.format(subgraph_path)
-                code=subprocess.call(cmd, shell=True)
-            
-                if code != 0:
-                    raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
-                    die(1)
-                    
             else:
                 pass # ignore if not in the search space
             
@@ -480,20 +410,24 @@ def no_vgc_sge_gplus(xg, bedfile, TFBS_len, chroms, verbose, cwd):
         pass
 
 
-def retrieve_kmers(TFBS_len, subgraphs_path, kmers_path):
+def get_kmers(xg, region, TFBS_len, seqs_file):
     """
-        Obtain the sequences from the subgraphs
+        Obtain the sequences of length k inside the queried
+        region
         ----
         Prameters:
+            xg (str) : path to the 
+            region (str) : region to query on the graph
             TFBS_len (int) : motif width
-            subgraphs_path (str) : path to the subgraphs
-            kmers_path (str) : path to which the sequences will be stored
+            seqs_file (str) : name of the file where the
+                                retrieved k-mers will be
+                                put
         ----
         Returns:
             code (int) : success or not of subprocess.call()
     """    
-    vg_km_cmd='vg kmers -k {0} {1} > {2}'.format(str(TFBS_len), subgraphs_path, kmers_path)
-    code=subprocess.call(vg_km_cmd, shell=True)
+    cmd = 'vg find -x {0} -E -p {1} -K {2} > {3}'.format(xg, region, TFBS_len, seqs_file)
+    code = subprocess.call(cmd, shell=True)
     
     return code
 
@@ -568,6 +502,7 @@ def getBEDregions(bedfile):
         die(1)
         
     else:
+        
         return regions
 
     finally:
