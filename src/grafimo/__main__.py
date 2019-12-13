@@ -244,18 +244,21 @@ def main(cmdLineargs = None):
             WITH_VG_CREATION = True
             
     if args.graph_genome:
-        if args.graph_genome.split('.')[-1] != 'xg' and \
-            args.graph_genome.split('.')[-1] != 'vg':
+        if (args.graph_genome.split('.')[-1] != 'xg' and \
+            args.graph_genome.split('.')[-1] != 'vg'):
             parser.error("Incorrect genome graph specified. Please check that they are in XG or VG format")
+
+        elif (not os.path.isfile(args.graph_genome)):
+            parser.error("Unable to find the specified graph genome")
         
         else:
             graph_genome = args.graph_genome
-            if len(glob.glob(graph_genome)) <= 0:
-                parser.error('Cannot find the specified graph genome')
-
             WITH_VG_CREATION = False
             
     if args.graph_genome_dir:
+        if (not os.path.isdir(args.graph_genome_dir)):
+            parser.error("The specified directory where to look for graph genomes doesn't exist")
+
         if args.graph_genome_dir[-1] == '/':
             graph_genome_dir = args.graph_genome_dir
 
