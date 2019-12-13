@@ -12,13 +12,13 @@ import sys
 #from src.grafimo.grafimo import __version__ as grafimo_version
 
 
-if sys.version_info[:2] < (3,7): # python 3.7 is required
+if sys.version_info[:2] < (3,6): # python 3.7 is required
     """
     Check Python version
-    It must be >= 3.7
+    It must be >= 3.6
     """
     
-    sys.stderr.write("Pyhton >= 3.7 is required to run GRAFIMO\n")
+    sys.stderr.write("Pyhton >= 3.6 is required to run GRAFIMO\n")
     sys.exit(1)
 
 # read README.md    
@@ -96,7 +96,7 @@ setup(
       extras_require={
           'dev': ['Cython']
       },
-      python_requires='>=3.7',
+      python_requires='>=3.6',
       classifiers=[
         "Development Status :: 1 - Beta",
         "Environment :: Console",
