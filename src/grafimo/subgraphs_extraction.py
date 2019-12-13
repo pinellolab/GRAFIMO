@@ -238,16 +238,21 @@ def vgc_sge(xg_loc, bedfile, TFBS_len, chroms, verbose, cwd):
                 code = get_kmers(xg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
-                    warn = "Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
-                    sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
-                                            # but we don't stop the execution
+                    if verbose:
+                        warn = "Region "+chrom+':'+'['+start+'-'+end+']'+" extraction failed!\n"
+                        sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
+                                                # but we don't stop the execution
+                    else:
+                        pass
                     
                 else:
                    
                     if verbose:
                         # write on the stderr
                         msg = "Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
-                        sys.stderr.write(msg) 
+                        sys.stderr.write(msg)
+                    else:
+                        pass 
                 
                 # if was not possible to extract the region we go to the next one
                 if os.stat(kmers_file).st_size <= 0:
@@ -316,15 +321,20 @@ def no_vgc_sge(xg, bedfile, TFBS_len, chroms, verbose, cwd):
                 code = get_kmers(xg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
-                    warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
-                    sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
-                                            # but we don't stop the execution
-                    
+                    if verbose:
+                        warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
+                        sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
+                                                # but we don't stop the execution
+                    else:
+                        pass
+
                 else:
                     if verbose:
                         # write to stderr
                         msg = "Region " + chrom + ':[' + start + '-' + end + ']' + " extracted\n"
-                        sys.stderr.write(msg) 
+                        sys.stderr.write(msg)
+                    else:
+                        pass 
 
                 # if was not possible to extract the region we go to the next one
                 if os.stat(kmers_file).st_size <= 0:
@@ -400,15 +410,20 @@ def no_vgc_sge_gplus(xg_loc, bedfile, TFBS_len, chroms, verbose, cwd):
                 code = get_kmers(xg, region_index, TFBS_len, kmers_file)
             
                 if code != 0:
-                    warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
-                    sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
-                                            # but we don't stop the execution
+                    if verbose:
+                        warn = "Region " + chrom + ':' + '[' + start + '-' + end + ']' + " extraction failed!\n"
+                        sys.stderr.write(warn)  # it can happen that wasn't possible to extract a peak
+                                                # but we don't stop the execution
+                    else:
+                        pass
                     
                 else:
                     if verbose:
                         # write on the stderr
                         msg="Region "+chrom+':['+start+'-'+end+']'+" extracted\n"
-                        sys.stderr.write(msg) 
+                        sys.stderr.write(msg)
+                    else:
+                        pass 
 
                 # if was not possible to extract the region we go to the next one
                 if os.stat(kmers_file).st_size <= 0:
@@ -458,23 +473,6 @@ def get_kmers(xg, region, TFBS_len, seqs_file):
     
     return code
 
-def extract_region(genome, region_index, subgraphs_path):
-    """
-        Extract the subgraphs
-        ----
-        Parameters:
-            genome (str) : path to the genome
-            region_index (str) : region to extract
-            subgraphs_path (str) : path to which the subgraphs will be stored
-        ----
-        Returns:
-            code (int) : success or not of subprocess.call()
-    """
-    
-    vg_sg_cmd='vg find -x {0} -p {1} > {2}'.format(genome, region_index, subgraphs_path)
-    code=subprocess.call(vg_sg_cmd, shell=True)
-    
-    return code
 
 def isGraph_genome_xg(graph_genome):
     """
@@ -500,6 +498,7 @@ def isGraph_genome_xg(graph_genome):
         raise VGException(msg)
         die(1)
     
+
 def getBEDregions(bedfile):
     """
         Function to retrieve the number of regions defined in the given BED
@@ -529,7 +528,6 @@ def getBEDregions(bedfile):
         die(1)
         
     else:
-        
         return regions
 
     finally:
@@ -546,7 +544,4 @@ def printSgeWelcomeMsg(bedfile):
     for _ in range(60):
         print('#', end='')
     print()
-
-class VGExtractionWarning(UserWarning): # used for the extraction warning handling
-    pass
 
