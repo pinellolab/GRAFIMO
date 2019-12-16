@@ -13,7 +13,8 @@ Graph-based Find Individual Motif Occurrences
 To build GRAFIMO on your machine, follow these steps:
 ```
 git clone https://github.com/pinellolab/GRAFIMO.git
-pip install GRAFIMO/
+cd GRAFIMO
+python3 setup.py install
 grafimo --help
 ```
 
