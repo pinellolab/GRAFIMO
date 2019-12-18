@@ -29,13 +29,15 @@ class Motif(object):
         Class to represent a motif.
         Are stored:
             - the motif matrix
-            - the motif matrix scaled
-            - the reverse matrix
-            - the reverse matrix scaled
+            - the motif scoring matrix (scaled)
+            - the reverse scoring matrix (scaled)
             - the pvalue matrix
+            - parameters used to scale the matrix
+            - the background distribution of the motif
             - the width of the motif
             - the minimum value in the motif matrix (both forward and reverse)
-            - the transcription factor's name
+            - the maximum value in the motif matrix (both forward and reverse)
+            - the transcription factor's name (both jaspar ID and conventional name)
             - the alphabet on which the matrix is built
     """
     
@@ -428,39 +430,49 @@ def build_motif_MEME(motif_file, bg_file, pseudocount, no_reverse):
     # check if the input is in MEME format
     if not isMEME_ff(motif_file):
         # if in other format we should not be here
-        raise Exception("Error: the motif file given is not in MEME format") 
+        raise NotValidFFException("Error: the motif file given is not in MEME format") 
         sys.exit(1)
 
     # read the motif file
-    motif=read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse)
+    motif_lst = read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse)
+    
+    # list of the fully processed motifs
+    complete_motifs = []
 
-    # get the log-odds
-    motif_log_odds=compute_log_odds(motif.getMotif_matrix(), motif.getWidth(),
-                                        motif.getBg(), motif.getAlphabet())
-    motif.setMotif_scoreMatrix(motif_log_odds)
+    # process each found motif
+    for m in motif_lst:
+        
+        # get the log-odds
+        motif_log_odds = compute_log_odds(m.getMotif_matrix(), m.getWidth(),
+                                                m.getBg(), m.getAlphabet())
+        m.setMotif_scoreMatrix(motif_log_odds)
 
-    # scale the log-odds scores
-    scaled_scores, min_val, max_val, scale, offset=scale_pwm(motif.getMotif_scoreMatrix(),
-                                                                motif.getAlphabet(),
-                                                                motif.getWidth())
-    motif.setMotif_scoreMatrix(scaled_scores)
-    motif.setIsScaled(True)
-    motif.setScale(scale)
-    motif.setMin_val(min_val)
-    motif.setMax_val(max_val)
-    motif.setOffset(offset)
+        # scale the log-odds scores
+        scaled_scores, min_val, max_val, scale, offset=scale_pwm(m.getMotif_scoreMatrix(),
+                                                                    m.getAlphabet(),
+                                                                    m.getWidth())
+        m.setMotif_scoreMatrix(scaled_scores)
+        m.setIsScaled(True)
+        m.setScale(scale)
+        m.setMin_val(min_val)
+        m.setMax_val(max_val)
+        m.setOffset(offset)
 
-    # compute the p-value matrix
-    pval_mat=comp_pval_mat(motif)
-    motif.setMotif_pval_matrix(pval_mat)
+        # compute the p-value matrix
+        pval_mat=comp_pval_mat(m)
+        m.setMotif_pval_matrix(pval_mat)
 
-    return motif
+        complete_motifs.append(m)
+
+    return complete_motifs
 
 
 def read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse):
     """
         Read the motif file in MEME format and build a motif
-        object from it
+        object from it.
+        Note that a MEME file can contain a variable number of
+        motifs
         ----
         Params:
             motif_file (str) : path to the motif file
@@ -478,51 +490,90 @@ def read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse):
 
         infostart = False  # flag to keep track were the infos about the motif begin
         datastart = False  # flag to keep track were the motif data begin
+        motifs_found = 0 # number of motifs found in the MEME file 
+        
+        motifID_lst = [] # list of the found motif IDs
+        motifName_lst = [] # list of the found motif names
+        motif_width_lst = [] # list of the found motif widths
+        site_counts_lst = [] # list of the found motif site counts
+        alphalen_lst = [] # list of the found motif alphabet lengths
+        motif_probs_lst = [] # list of the found motif probability matrices
+        a_lst = [] # list of the found As probabilities for each motif
+        c_lst = [] # list of the found Cs probabilities for each motif
+        g_lst = [] # list of the found Gs probabilities for each motif
+        t_lst = [] # list of the found Ts probabilities for each motif
 
-        a = []
-        c = []
-        g = []
-        t = []
-
-        pos_read=0
+        motif_width = None
+        pos_read = 0
 
         for line in mf:
-            if line[0:8]=='ALPHABET':
+            if line[0:8] == 'ALPHABET':
                 alphabet = sorted(list(set(line[10:-1])))
                 assert isListEqual(alphabet, DNA_ALPHABET)
 
-            if line[0:5]=='MOTIF':
-                motifID, motifName = line.split(' ')[1:3]
-                motifName=motifName[:-1]  # remove \n char
+            if line[0:5] == 'MOTIF':
+                motifID, motifName = line.split()[1:3]
+
+                motifID_lst.append(motifID)
+                motifName_lst.append(motifName)
+
                 # the informations about motif start here
-                infostart=True
+                infostart = True
                 continue
 
-            if infostart:
-                infos=line[26:]
-                infosplit=infos.split(' ')
-                alphalen=int(infosplit[2])
+            if infostart and len(line.strip()) != 0:
+                infos = line[26:]
+                infosplit = infos.split()
+                alphalen = int(infosplit[1])
+                alphalen_lst.append(alphalen)
 
-                assert alphalen==len(alphabet)
+                assert alphalen == len(alphabet)
 
-                motif_width=int(infosplit[4])
-                site_counts=int(infosplit[6])
-                infostart=False  # informations end here
+                motif_width = int(infosplit[3])
+                site_counts = int(infosplit[5])
+                infostart = False  # informations end here
 
                 # allocate space for the motif probability matrix
-                motif_probs=pd.DataFrame(index=alphabet, columns=range(motif_width),
-                                          data=np.double(0))
+                motif_probs = pd.DataFrame(index=alphabet, columns=range(motif_width),
+                                            data=np.double(0))
+
+                motif_width_lst.append(motif_width)
+                site_counts_lst.append(site_counts)
+                motif_probs_lst.append(motif_probs)
 
                 datastart = True  # at next step begin data
+
+                # initialize nucleotide data
+                a = []
+                c = []
+                g = []
+                t = []
                 continue
 
             if datastart and pos_read < motif_width:
-                freqs=line.split(' ')
-                a.append(np.double(freqs[1]))
-                c.append(np.double(freqs[3]))
-                g.append(np.double(freqs[5]))
-                t.append(np.double(freqs[7][:-1]))  # remove '\n'
-                pos_read+=1
+                freqs = line.split()
+                a.append(np.double(freqs[0]))
+                c.append(np.double(freqs[1]))
+                g.append(np.double(freqs[2]))
+                t.append(np.double(freqs[3]))  
+                pos_read += 1
+
+            # we read all the motif
+            if pos_read == motif_width:
+                a_lst.append(a)
+                c_lst.append(c)
+                g_lst.append(g)
+                t_lst.append(t)
+
+                # update stats about found motifs
+                motifs_found += 1
+
+                # clear the statistics
+                pos_read = 0
+                motif_width = None
+                datastart = False
+                alphalen = -1
+                datastart = False 
 
     except:  # something went wrong
         msg = ' '.join(["Unable to read file", motif_file])
@@ -530,26 +581,37 @@ def read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse):
         die(1)
 
     else:
-        motif_probs.loc['A']=a
-        motif_probs.loc['C']=c
-        motif_probs.loc['G']=g
-        motif_probs.loc['T']=t
 
+        # read the background
         if bg_file:
-            bgs=readBGfile(bg_file)
+            bgs = readBGfile(bg_file)
         else:
-            bgs=get_uniformBG(alphabet)
+            bgs = get_uniformBG(alphabet)
 
-        bgs=pseudo_bg(bgs, no_reverse)
+        bgs = pseudo_bg(bgs, no_reverse)
 
-        motif_probs=norm_motif(motif_probs, motif_width, alphabet)
-        motif_probs=apply_pseudocount_meme(motif_probs, pseudocount, site_counts, motif_width,
-                                            bgs, alphabet)
+        motif_lst = [] # list of motifs found
 
-        motif=Motif(motif_probs, motif_width, alphabet, motifID, motifName)
-        motif.setBg(bgs)
+        for i in range(motifs_found):
+            mp = motif_probs_lst[i]
 
-        return motif
+            mp.loc['A'] = a_lst[i]
+            mp.loc['C'] = c_lst[i]
+            mp.loc['G'] = g_lst[i]
+            mp.loc['T'] = t_lst[i]
+
+            mw = motif_width_lst[i]
+            sc = site_counts_lst[i]
+
+            mp = norm_motif(mp, mw, alphabet)
+            mp = apply_pseudocount_meme(mp, pseudocount, sc, mw, bgs, alphabet)
+
+            motif = Motif(mp, mw, alphabet, motifID_lst[i], motifName_lst[i])
+            motif.setBg(bgs)
+
+            motif_lst.append(motif)
+
+        return motif_lst
 
     finally:
         mf.close() # close the file anyway
@@ -636,16 +698,23 @@ def get_motif_pwm(motif_file, bgs, pseudo, no_reverse):
         raise MissingFileException("The motif file is missing")
         die(1)
 
+    if (not isMEME_ff(motif_file)) and (not isJaspar_ff(motif_file)):
+        raise NotValidFFException("The motif file must be in MEME or JASPAR format")
+        die(1)
+
     if isJaspar_ff(motif_file):
-        motif=build_motif_JASPAR(motif_file, bgs, pseudo, no_reverse)
+        motif = build_motif_JASPAR(motif_file, bgs, pseudo, no_reverse)
         
     elif isMEME_ff(motif_file):
-        motif=build_motif_MEME(motif_file, bgs, pseudo, no_reverse)
+        motif = build_motif_MEME(motif_file, bgs, pseudo, no_reverse)
 
     else:
-        msg=' '.join(["Do not know what to do with file", motif_file])
+        msg = ' '.join(["Do not know what to do with file", motif_file])
         raise NotValidFFException(msg)
         die(1)
+
+    if not isinstance(motif, list):
+        motif = [motif]
 
     return motif
 

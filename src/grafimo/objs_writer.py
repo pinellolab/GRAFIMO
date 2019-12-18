@@ -17,7 +17,7 @@ import pandas as pd
 from grafimo.GRAFIMOException import ValueException, SubprocessException, NoDataFrameException, FileReadingException
 from grafimo.utils import die
 
-def writeresults(objs, dest):
+def writeresults(objs, dest, motifID):
     
     if not isinstance(objs, list):
         raise ValueException("The results to write must be in a list")
@@ -28,6 +28,8 @@ def writeresults(objs, dest):
         die(1)
         
     cwd=os.getcwd()
+
+    dest = '_'.join([dest, motifID])
     
     if not os.path.isdir(dest): # tthe directory not exist
     
@@ -47,6 +49,7 @@ def writeresults(objs, dest):
         # the content will be automatically rewritten
     
     # write objects in dest
+    printWriteResultsMsg(dest)
     
     for obj in objs:
         
@@ -61,15 +64,10 @@ def writeresults(objs, dest):
             
             # write the gff
             writeGFF3(df)
-            
-            
-        
-        ### if matplotlib istance ###
-        ## write plots in dest ##
-        
     
     os.chdir(cwd)
     
+
 def writeGFF3(data):
     """
         Write a GFF file for the hits found by grafimo. 
@@ -130,3 +128,11 @@ def writeGFF3(data):
 
     finally:
         f.close() # close the file stream
+
+
+def printWriteResultsMsg(dest):
+
+    print()
+    msg = ' '.join(["Writing results in", dest])
+    print(msg)
+    print()

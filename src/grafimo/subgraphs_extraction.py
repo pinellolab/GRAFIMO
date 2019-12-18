@@ -535,13 +535,7 @@ def getBEDregions(bedfile):
 
 def printSgeWelcomeMsg(bedfile):
 
-    print()
-    for _ in range(60):
-        print('#', end='')
     print()  # newline
     print("\nExtracting subgraphs from regions defined in ", bedfile)
-    print()
-    for _ in range(60):
-        print('#', end='')
     print()
 

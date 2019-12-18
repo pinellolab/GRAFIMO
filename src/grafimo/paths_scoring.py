@@ -82,7 +82,6 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     scannedSeqsDict = manager.dict() # sequences scanned
         
     sgs=glob.glob('*.tsv')
-    print(len(sgs))
     sgs_splt=np.array_split(sgs, NCORES)
     jobs=[]
     proc_finished=0
@@ -375,32 +374,6 @@ def compute_qvalues(pvalues):
 
     return qvalues
 
-"""
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    
-        Print the progress bar in the sequence scoring process
-        ----
-        Parameters:
-            iteration (int)
-            total (int)
-            prefix (str)
-            suffix (str)
-            decimals (int)
-            length (int)
-            fill (str)
-            printEnd (str)
-        ----
-        Returns
-            None
-    
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
-    # Print New Line on Complete
-    if iteration == total:
-        print()   
-"""
         
 def buildDF(motif, seqnames, starts, ends, strands, 
                 scores, pvalues, qvalues, sequences, pvalueT):
@@ -522,20 +495,6 @@ def buildDF(motif, seqnames, starts, ends, strands,
     # values are sorted by p-value
     df = df.sort_values(['p-value'], ascending=True)
 
-    # format score, p-value and q-value
-   # for idx in range(DFLEN):
-    #    new_score = round(df.loc[idx, 'score'], 4)
-     #   df.loc[idx, 'score'] = new_score
-
-      #  new_pvalue = np.format_float_scientific(df.loc[idx, 'p-value'],
-                                                    #precision=4)
-       # df.loc[idx, 'p-value'] = new_pvalue
-
-        #if QVAL:
-         #   new_qvalue = np.format_float_scientific(df.loc[idx, 'q-value'],
-                                                     #   precision=4)
-          #  df.loc[idx, 'q-value'] = new_qvalue
-
     df.index = list(range(1, DFLEN+1))
         
     return df
@@ -553,19 +512,13 @@ def scoringPathsMsg(no_reverse, motif):
     if not no_reverse:
         revID=''.join(['-', motifID])
 
-    print()
-    for _ in range(20):
-            print('#', end='')
     print() # newline
     print('Scoring hits for motif', posID, sep=' ')
-    print()
     
     # if we score also the reverse complement
     if not no_reverse: 
         print('Scoring hits for motif', revID, sep=' ')
-        print()
-        
-    for _ in range(20):
-        print('#', end='')
+    
     print() # newline
+    
         

@@ -103,9 +103,9 @@ def get_AP():
     group.add_argument("-l", "--linear-genome", type=str, help='Path to the linear genome (fasta format required)',
                            nargs='?', default='', metavar='LINEAR-GENOME', dest='linear_genome')
     group.add_argument("-c", "--chroms", type=str, nargs='*',
-                        help='Chromosomes to consider in the pipeline application.\n'
+                        help='Chromosome numbers to consider in the pipeline application.\n'
                              'To consider all the chromosomes, just skip this argument',
-                        default=[], metavar='1, 2, X, ...')
+                        default=[], metavar=('1', 'X'))
     group.add_argument("-v", "--vcf", type=str, help='Path to the VCF file. The vcf must be compressed (vcf.GZ)',
                         nargs='?', default='', metavar='VCF')
     group.add_argument("-g", "--graph-genome", type=str, nargs= '?', metavar='GRAPH-GENOME',
@@ -117,7 +117,7 @@ def get_AP():
                            default='', dest='graph_genome_dir')
     group.add_argument("-b", "--bedfile", type=str, help='Path to the BED file that defines the regions to score',
                            metavar='BEDFILE')
-    group.add_argument("-m", "--motif", type=str, metavar='MOTIF',
+    group.add_argument("-m", "--motif", type=str, nargs='+', metavar=('MOTIF1', 'MOTIF2'),
                            help='Path to the motif file to use for the scoring of the '
                                 'sequences (JASPAR or MEME format required)')
     
@@ -283,16 +283,16 @@ def main(cmdLineargs = None):
     else:
         parser.error('No BED file given')
         
-    if not args.motif or \
-        (args.motif.split('.')[-1] != 'jaspar' and \
-            args.motif.split('.')[-1] != 'meme'):
-        parser.error('Incorrect motif file given, only JASPAR or MEME format allowed')
+    if not args.motif:
+        parser.error('No motif given')
         
     else:
-        motif = args.motif
+        motifs = args.motif
 
-        if len(glob.glob(motif)) <= 0:
-            parser.error('Cannot find the specified motif file')
+        # check if the given motifs exist
+        for m in motifs:
+            if len(glob.glob(m)) <= 0:
+                parser.error('Cannot motif file: ' + m)
         
     if args.bgfile:
         bgfile = args.bgfile # we have a path to the bg file
@@ -379,7 +379,7 @@ def main(cmdLineargs = None):
         if verbose:
             print("\nEntering the pipeline with the variation graph creation\n")
 
-        with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motif, bgfile,
+        with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
                              pseudocount, pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION, verbose)
         
         
@@ -405,7 +405,7 @@ def main(cmdLineargs = None):
             if verbose:
                 print("The graph " + xg + " will be queried\n")
         
-            without_vg_pipeline(cores, xg, bedfile, motif, bgfile, pseudocount, 
+            without_vg_pipeline(cores, xg, bedfile, motifs, bgfile, pseudocount, 
                                     pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION)
             
         elif args.graph_genome_dir:
@@ -415,7 +415,7 @@ def main(cmdLineargs = None):
             if verbose:
                 print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
             
-            without_vg_pipeline(cores, graph_genome_dir, bedfile, motif, bgfile, pseudocount,
+            without_vg_pipeline(cores, graph_genome_dir, bedfile, motifs, bgfile, pseudocount,
                                     pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION, gplus, chroms)
             
     else:
@@ -437,3 +437,4 @@ def main(cmdLineargs = None):
 
 if __name__=="__main__":
     main()
+
