@@ -31,7 +31,7 @@ Citation:
     
     
 Run 'grafimo --help'to see all command-line options.
-See https://github.com/InfOmics/GRAFIMO for the full documentation.
+See https://github.com/pinellolab/GRAFIMO or https://github.com/InfOmics/GRAFIMO for the full documentation.
 
 """
 
@@ -147,6 +147,11 @@ def get_AP():
                         help='Name of the directory where the results will be stored [optional]',
                         nargs='?', const='grafimo_out', default='grafimo_out', metavar='OUTDIR')
 
+    group.add_argument("--top-graphs", type=int,
+                        help='Number of graphs of the regions that will be stored as PNG images in the results '
+                        'directory [optional]',
+                        nargs='?', const=0, default=0, metavar='GRAPHS_NUM', dest='top_graphs')
+
     group.add_argument("--verbose",  default = False, action = 'store_true',
                         help = "Output a lot of additional informations about the execution")
     
@@ -158,8 +163,7 @@ def main(cmdLineargs = None):
         Main function of the tool
         ----
         Parameters:
-            cmdLineArgs (str) : the arguments given in command line
-            
+            cmdLineArgs (str) : the arguments given in command line 
         ----
         Returns:
             None
@@ -344,6 +348,12 @@ def main(cmdLineargs = None):
         # to the name
         dest = ''.join([dest, '_', str(os.getpid())])
 
+    if args.top_graphs < 0:
+        parser.error("The number of region graphs to show must be positive")
+
+    else:
+        top_graphs = args.top_graphs
+
     if not isinstance(args.verbose, bool) and args.verbose != False \
         and args.verbose != True:
         parser.error('The --verbose parameter accepts only True or False values')
@@ -373,14 +383,13 @@ def main(cmdLineargs = None):
     # the dependency check was OK
 
     if WITH_VG_CREATION:
-            
-        dest = ''.join([dest, '/'])
         
         if verbose:
             print("\nEntering the pipeline with the variation graph creation\n")
 
         with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
-                             pseudocount, pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION, verbose)
+                            pseudocount, pvalueT, no_reverse, qvalue, text_only, dest,
+                            top_graphs, WITH_VG_CREATION, verbose)
         
         
     elif not WITH_VG_CREATION:
@@ -406,7 +415,7 @@ def main(cmdLineargs = None):
                 print("The graph " + xg + " will be queried\n")
         
             without_vg_pipeline(cores, xg, bedfile, motifs, bgfile, pseudocount, 
-                                    pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION)
+                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, WITH_VG_CREATION)
             
         elif args.graph_genome_dir:
             
@@ -416,7 +425,7 @@ def main(cmdLineargs = None):
                 print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
             
             without_vg_pipeline(cores, graph_genome_dir, bedfile, motifs, bgfile, pseudocount,
-                                    pvalueT, no_reverse, qvalue, text_only, dest, WITH_VG_CREATION, gplus, chroms)
+                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, WITH_VG_CREATION, gplus, chroms)
             
     else:
         # error in the pipeline flag
@@ -437,4 +446,4 @@ def main(cmdLineargs = None):
 
 if __name__=="__main__":
     main()
-
+    

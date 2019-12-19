@@ -174,6 +174,32 @@ def correct_path(path, path_id='', file_format=''):
 
     return new_path
 
+
+def unique_lst(lst):
+    """
+        Get the unique values inside a list
+        ----
+        Parameters:
+            lst (list) : list of values
+        ----
+        Returns:
+            unique_lst (list) : list of the unique values in lst
+    """
+
+    assert(len(lst) > 0)
+
+    unique_lst = []
+
+    for el in lst:
+
+        if el not in unique_lst:
+            unique_lst.append(el)
+
+    assert(len(unique_lst) > 0)
+
+    return unique_lst
+
+
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     """
         Print the progress bar in the sequence scoring process and graph extraction

@@ -27,8 +27,8 @@ import os
 __version__ = '0.8'
 
 def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile, 
-                         pseudo, pvalueT, no_reverse, qvalue, text_only, dest, pipeline, 
-                         verbose = False):
+                         pseudo, pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, 
+                         pipeline, verbose = False):
     
     gplus = False # prevent unexpected behaviors
 
@@ -58,11 +58,11 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
 
         else:
             objs_towrite=[df] # initialize the list of objects to save
-            ow.writeresults(objs_towrite, dest, m.getMotifID()) # write results
+            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, vg_loc) # write results
     
 def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo, 
-                            pvalueT, no_reverse, qvalue, text_only, dest, pipeline, gplus=False, 
-                            chroms=[], verbose = False):
+                            pvalueT, no_reverse, qvalue, text_only, dest, top_graphs,
+                            pipeline, gplus=False, chroms=[], verbose = False):
     
     printWelcomeMsg("WITHOUT_VG_CREATION")
     
@@ -86,7 +86,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo,
 
         else:
             objs_towrite=[df] # initialize the list of objects to save
-            ow.writeresults(objs_towrite, dest, m.getMotifID())
+            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, graph_genome)
 
 def printWelcomeMsg(pipeline):
     """

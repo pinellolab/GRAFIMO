@@ -118,6 +118,7 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     ends = []
     pvalues = []
     strands = []
+    references = []
 
     for key in returnDict.keys():
         seqs += returnDict[key]['sequence'].to_list()
@@ -128,6 +129,7 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         ends += returnDict[key]['end'].to_list()
         pvalues += returnDict[key]['pvalue'].to_list()
         strands += returnDict[key]['strand'].to_list()
+        references += returnDict[key]['reference'].to_list()
 
     # get the total sequences scanned
     seqsScanned = 0
@@ -140,15 +142,15 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         nucsScanned += scannedNucsDict[key]
 
     # compute the q-values
-    qvalues = []
     if qvalue:
+        qvalues = []
         qvalues = compute_qvalues(pvalues)
 
     print("\nScanned sequences:", seqsScanned)
     print("Scanned nucleotides:", nucsScanned)
             
     finaldf = buildDF(motif, seqnames, starts, ends, strands, scores,
-                        pvalues, qvalues, seqs, pvalueT)
+                        pvalues, qvalues, seqs, references, pvalueT)
             
     return finaldf
 
@@ -256,13 +258,6 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
         Returns:
             None
     """
-    
-    #sg_paths_dict, sg_directions_dict, sg_starts_dict, sg_ends_dict = get_subgraphs_dict(sgs)
-
-    # there is no match beetwen the two dictionaries
-    #if set(sg_paths_dict.keys()) != set(sg_directions_dict.keys()):
-    #    raise ValueException("No match between paths and strands")
-    #    die(1)
 
     scoreMatrix = motif.getMotif_scoreMatrix()
     pval_mat = motif.getMotif_pval_mat()
@@ -279,6 +274,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     starts = []
     ends = []
     strands = []
+    references = []
 
     seqsScanned = 0 # counter for the sequences scanned
     
@@ -298,6 +294,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                     start = start[:-1]
                     end = sg_data.loc[i, 3].split(':')[1]
                     end = end[:-1]
+                    reference = sg_data.loc[i, 4]
                     score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
                                                 width, offset)
                     # forward strand
@@ -310,11 +307,12 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                     chroms.append(chrom)
                     starts.append(start)
                     ends.append(end)
+                    references.append(reference)
 
                     seqsScanned += 1
                         
             else:
-                
+
                 seq = sg_data.loc[i, 1]
                 seqname = sg_data.loc[i, 0]
                 chrom = seqname.split(':')[0]
@@ -322,6 +320,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                 start = start[:-1]
                 end = sg_data.loc[i, 3].split(':')[1]
                 end = end[:-1]
+                reference = sg_data.loc[i, 4]
                 score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
                                             width, offset)
                 seqs.append(seq)
@@ -332,6 +331,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                 chroms.append(chrom)
                 starts.append(start)
                 ends.append(end)
+                references.append(reference)
 
                 seqsScanned += 1
 
@@ -345,6 +345,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     summary['score'] = scores
     summary['pvalue'] = pvalues
     summary['strand'] = strands
+    summary['reference'] = references
     
     returnDict[psid] = summary
     scannedSeqsDict[psid] = seqsScanned
@@ -376,7 +377,7 @@ def compute_qvalues(pvalues):
 
         
 def buildDF(motif, seqnames, starts, ends, strands, 
-                scores, pvalues, qvalues, sequences, pvalueT):
+                scores, pvalues, qvalues, sequences, references, pvalueT):
     """
         Build the dataframe summarizing the obtained results
         ----
@@ -390,6 +391,10 @@ def buildDF(motif, seqnames, starts, ends, strands,
             pvalues (list) : list of the p-values for the hits
             qvalues (list) : list of q-values for the hits
             sequences (list) : list of the hits
+            references (list) : list that keep track of the fact if a sequence
+                                belongs to the reference genome or is obtained
+                                from the variants dfined in the VCF used to
+                                build the genome graph
             pvalueT (float) : p-value threshold
         ----
         Returns:
@@ -428,6 +433,9 @@ def buildDF(motif, seqnames, starts, ends, strands,
         raise ValueException("The sequences must be in a list")
         die(1)
 
+    if not isinstance(references, list):
+        raise ValueException("The reference list must be of list type")
+
     # all lists must have the same length
     LSTLEN=len(seqnames)
 
@@ -437,6 +445,7 @@ def buildDF(motif, seqnames, starts, ends, strands,
     assert len(scores) == LSTLEN
     assert len(pvalues) == LSTLEN
     assert len(sequences) == LSTLEN
+    assert len(references) == LSTLEN
 
     # check if we have also the q-values
     QVAL = False
@@ -451,6 +460,7 @@ def buildDF(motif, seqnames, starts, ends, strands,
     scores_thresh = []
     pvalues_thresh = []
     sequences_thresh = []
+    references_thresh = []
 
     if QVAL:
         qvalues_thresh = []
@@ -466,31 +476,35 @@ def buildDF(motif, seqnames, starts, ends, strands,
             scores_thresh.append(scores[idx])
             pvalues_thresh.append(pvalues[idx])
             sequences_thresh.append(sequences[idx])
+            references_thresh.append(references[idx])
 
             if QVAL:
                 qvalues_thresh.append(qvalues[idx])
 
     DFLEN = len(seqnames_thresh)
 
-    motifIDs=[motif.getMotifID()]*DFLEN
-    motifNames=[motif.getMotifName()]*DFLEN
+    # TF's name and ID list
+    motifIDs = [motif.getMotifID()]*DFLEN
+    motifNames = [motif.getMotifName()]*DFLEN
 
     # build the final dataframe
-    df=pd.DataFrame()
-    df['motif_id']=motifIDs
-    df['motif_alt_id']=motifNames
-    df['sequence_name']=seqnames_thresh
-    df['start']=starts_thresh
-    df['stop']=ends_thresh
-    df['strand']=strands_thresh
-    df['score']=scores_thresh
-    df['p-value']=pvalues_thresh
+    df = pd.DataFrame()
+    df['motif_id'] = motifIDs
+    df['motif_alt_id'] = motifNames
+    df['sequence_name'] = seqnames_thresh
+    df['start'] = starts_thresh
+    df['stop'] = ends_thresh
+    df['strand'] = strands_thresh
+    df['score'] = scores_thresh
+    df['p-value'] = pvalues_thresh
 
-    # ad the q-values to the final dataframe if they have been computed
+    # add the q-values to the final dataframe if they have been computed
     if QVAL:
-        df['q-value']=qvalues_thresh
+        df['q-value'] = qvalues_thresh
 
-    df['matched_sequence']=sequences_thresh
+    # finish to build the data frame
+    df['matched_sequence'] = sequences_thresh
+    df['reference'] = references_thresh
         
     # values are sorted by p-value
     df = df.sort_values(['p-value'], ascending=True)

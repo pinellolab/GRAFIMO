@@ -14,7 +14,7 @@ k-mer scoring step
 
 import pandas as pd
 from grafimo.GRAFIMOException import ValueException, NoDataFrameException
-from grafimo.utils import die
+from grafimo.utils import die, REV_COMPL
 
 ### score each k-mer ###
 cdef cscore_seq(seq, scoreMatrix, pval_mat, minScore, scale, width, offset):
@@ -46,23 +46,25 @@ cdef cscore_seq(seq, scoreMatrix, pval_mat, minScore, scale, width, offset):
     assert width > 0
 
     cdef int score = 0
+    cdef int rev_score = 0
     cdef double pvalue
     cdef double logodds_score
 
     for idx, nuc in enumerate(seq):
-        nuc=nuc.upper()
+        nuc = nuc.upper()
 
         if nuc == 'N':
-            score=minScore
+            score = minScore
             break # we don't go further
 
-        score+=scoreMatrix.loc[nuc, idx]
+        score += scoreMatrix.loc[nuc, idx]
 
-    assert score >= 0 and score <= width*1000
-    pvalue=getPvalue(pval_mat, score)
+    assert score >= 0 and score <= width*1000 # score must be in range
+    
+    pvalue = getPvalue(pval_mat, score)
 
-    # turns score to log-odds
-    logodds_score=recover_logodds(score, scale, width, offset)
+    # turns back score to log-odds
+    logodds_score = recover_logodds(score, scale, width, offset)
 
     return logodds_score, pvalue
 
