@@ -1,5 +1,5 @@
 # Use the VG Docker image and build over it
-FROM quay.io/vgteam/vg:v1.19.0
+FROM quay.io/vgteam/vg:v1.20.0
 
 # Update Ubuntu Software repository
 RUN apt-get update
