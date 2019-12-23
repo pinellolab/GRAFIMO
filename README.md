@@ -7,6 +7,7 @@ Graph-based Find Individual Motif Occurrences
 **dependencies needed**
 - vg (https://github.com/vgteam/vg)
 - tabix (https://github.com/samtools/tabix)
+- graphviz (https://www.graphviz.org/)
 
 **pip installation**
 
