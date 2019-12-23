@@ -49,15 +49,17 @@ cdef cscore_seq(seq, scoreMatrix, pval_mat, minScore, scale, width, offset):
     cdef int rev_score = 0
     cdef double pvalue
     cdef double logodds_score
+    cdef int seq_len = len(seq)
 
-    for idx, nuc in enumerate(seq):
+    for i in range(seq_len):
+        nuc = seq[i]
         nuc = nuc.upper()
 
         if nuc == 'N':
             score = minScore
             break # we don't go further
 
-        score += scoreMatrix.loc[nuc, idx]
+        score += scoreMatrix.loc[nuc, i]
 
     assert score >= 0 and score <= width*1000 # score must be in range
     

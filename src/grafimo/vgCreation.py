@@ -120,24 +120,33 @@ def create_vg(chroms, linear_genome='', vcf=''):
     cwd=os.getcwd()
     
     if not tbiexist(cwd):
-        msg=''.join([vcf, ".tbi file not found indexing with tabix..."])
+        msg=''.join([vcf.split('/')[-1], ".tbi file not found indexing with tabix..."])
         print(msg)
-        cmd='tabix -p vcf {0}'.format(vcf) #
+        cmd='tabix -p vcf {0}'.format(vcf)
         code=subprocess.call(cmd, shell=True)
 
         if code!=0:
             raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
             die(1)
-    
-    if linear_genome[0:6]=='/Users':
-        pass
-    else:
-        linear_genome=''.join(['./', linear_genome])
-        
-    if vcf[0:6]=='/Users':
-        pass
-    else:
-        vcf=''.join(['./', vcf])
+    else: # we update the index
+        msg = ' '.join(["Reindexing", vcf.split('/')[-1], "..."])
+        print(msg)
+
+        # remove the existing TBI file
+        cmd = "rm {0}".format(''.join([vcf, ".tbi"]))
+        code = subprocess.call(cmd, shell=True)
+
+        if code != 0:
+            raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
+            die(1)
+
+        # reindex the VCF
+        cmd = "tabix -p vcf {0}".format(vcf)
+        code = subprocess.call(cmd, shell=True)
+
+        if code != 0:
+            raise SubprocessException(' '.join(["An error occurred while executing", cmd, ". Exiting"]))
+            die(1)
     
     for chrom_n in chroms:
         chrom=''.join(['chr', chrom_n])
@@ -155,8 +164,9 @@ def create_vg(chroms, linear_genome='', vcf=''):
             msg+='Unable to build the vg of the genome using {0} and {1}'.format(linear_genome,
                                                                                     vcf)
             raise VGException(msg)
-            
-        print('Indexing the VG...')
+
+        msg = ' '.join(["Indexing", vg, '...'])
+        print(msg)
             
         vg_index='vg index -p -x {0} {1}'.format(xg, vg)
         code=subprocess.call(vg_index, shell=True)

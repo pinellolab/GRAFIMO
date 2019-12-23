@@ -23,7 +23,7 @@ REV_COMPL={'A':'T', 'C':'G', 'G':'C', 'T':'A'}
 LOG_FACTOR=1.44269504
 RANGE=1000
 CHROMS_LIST=[str(i) for i in range(1, 23)] + ['X', 'Y']
-EXT_DEPS = ['tabix', 'vg']
+EXT_DEPS = ['tabix', 'vg', 'dot']
 
 """
     functions from utils.py
@@ -175,12 +175,15 @@ def correct_path(path, path_id='', file_format=''):
     return new_path
 
 
-def unique_lst(lst):
+def unique_lst(lst, size = None):
     """
         Get the unique values inside a list
         ----
         Parameters:
             lst (list) : list of values
+            size (int) : number of unique elements the list must contain.
+                         By default it is set to None, then all the element
+                         of the list will be checked.
         ----
         Returns:
             unique_lst (list) : list of the unique values in lst
@@ -189,11 +192,16 @@ def unique_lst(lst):
     assert(len(lst) > 0)
 
     unique_lst = []
+    el_num = 0
 
     for el in lst:
 
         if el not in unique_lst:
             unique_lst.append(el)
+            el_num += 1
+
+        if size != None and el_num == size: # size limit reached
+            break
 
     assert(len(unique_lst) > 0)
 

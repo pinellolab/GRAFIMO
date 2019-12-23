@@ -316,7 +316,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                 seq = sg_data.loc[i, 1]
                 seqname = sg_data.loc[i, 0]
                 chrom = seqname.split(':')[0]
-                start = sg_data.loc[i, 2].split(':')[1]
+                start = sg_data.at[i, 2].split(':')[1]
                 start = start[:-1]
                 end = sg_data.loc[i, 3].split(':')[1]
                 end = end[:-1]

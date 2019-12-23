@@ -426,7 +426,7 @@ def no_vgc_sge_gplus(xg_loc, bedfile, TFBS_len, chroms, verbose, cwd):
                         pass 
 
                 # if was not possible to extract the region we go to the next one
-                if os.stat(kmers_file).st_size <= 0:
+                if os.stat(kmers_file).st_size <= 0 and os.path.isfile(kmers_file):
 
                     cmd = 'rm {0}'.format(kmers_file) # remove the empty file 
                     code = subprocess.call(cmd, shell=True)

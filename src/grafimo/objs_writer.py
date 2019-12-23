@@ -64,13 +64,12 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
             
             # write the gff
             writeGFF3(df)
-    
-    """
+
     # get the graphs of the top n regions 
     if top_graphs > 0:
         # get the region list (it's already sorted)
         regions = df['sequence_name'].to_list()
-        regions = unique_lst(regions)
+        regions = unique_lst(regions, size=top_graphs)
 
         if len(regions) < top_graphs:
             top_graphs = len(regions)
@@ -96,7 +95,6 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
             region = regions[i]
 
             getRegion_graph(region, genome_loc)
-    """
 
     os.chdir(cwd)
 
@@ -183,7 +181,7 @@ def getRegion_graph(region, genome_loc):
 
         png_file = ''.join([region, '.png'])
 
-        # extract the PNG of region
+        # extract the PNG image of region
         cmd = "vg find -x {0} -p {1} | vg view -dp | dot -Tpng -o {2}".format(genome_loc, region, png_file)
         code = subprocess.call(cmd, shell = True)
 
@@ -198,13 +196,42 @@ def getRegion_graph(region, genome_loc):
             die(1)
 
         xg = ''.join([region.split(':')[0], '.xg'])
+        if genome_loc[-1] == '/':
+            xg = ''.join([genome_loc, xg])
+        else:
+            xg = '/'.join([genome_loc, xg])
+        
+        # extract the PNG image of the region
+        vg_region = ''.join([region, ".vg"])
+        cmd = "vg find -x {0} -E -p {1} > {2}".format(xg, region, vg_region)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
+
+        dot_region = ''.join([region, ".dot"])
+        cmd = "vg view {0} -dp > {1}".format(vg_region, dot_region)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
 
         png_file = ''.join([region, '.png'])
-        
-        # extract the PNG of the region
-        cmd = "vg find -x {0} -p {1} | vg view -dp | dot -Tpng -o {2}".format(xg, region, png_file)
-        code = subprocess.call(cmd, shell = True)
+        cmd = "dot -Tpng {0} -o {1}".format(dot_region, png_file)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
 
+        # clean the directory from unused files
+        cmd = "rm *.vg"
+        code = subprocess.call(cmd, shell = True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
+
+        cmd = "rm *.dot"
+        code = subprocess.call(cmd, shell=True)
         if code != 0:
             raise SubprocessException("Error while executing " + cmd)
             die(1)

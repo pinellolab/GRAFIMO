@@ -20,9 +20,6 @@ from . import motif_set as mtf_set
 from . import paths_scoring as ps
 from . import vgCreation as vgc
 from . import objs_writer as ow
-from grafimo.utils import isMEME_ff
-import sys
-import os
 
 __version__ = '0.8'
 
@@ -76,6 +73,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo,
 
     motif_lst = motifSet.getMotifsList()
     for m in motif_lst:
+
         data = sge.get_data(graph_genome, bedfile, m.getWidth(), pipeline, gplus, 
                                 chroms, cores) # extract the region peaks
         df = ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse, qvalue)

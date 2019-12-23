@@ -228,6 +228,9 @@ def main(cmdLineargs = None):
 
             if len(glob.glob(linear_genome)) != 1:
                 parser.error('Cannot find the specified linear genome file')
+
+            # get the absolute path to the linear genome
+            linear_genome = os.path.abspath(linear_genome)
             
     if args.chroms:
         chroms = args.chroms
@@ -244,6 +247,9 @@ def main(cmdLineargs = None):
 
             if len(glob.glob(vcf)) <= 0:
                 parser.error('Cannot find the specified VCF file')
+
+            # get the absolute path to the VCF
+            vcf = os.path.abspath(vcf)
             
             WITH_VG_CREATION = True
             
@@ -257,6 +263,7 @@ def main(cmdLineargs = None):
         
         else:
             graph_genome = args.graph_genome
+            graph_genome = os.path.abspath(graph_genome)
             WITH_VG_CREATION = False
             
     if args.graph_genome_dir:
@@ -271,6 +278,8 @@ def main(cmdLineargs = None):
             
         if len(glob.glob(graph_genome_dir+'*.xg')) <= 0:
             parser.error('No xg file found in the specified directory')
+
+        graph_genome_dir = os.path.abspath(graph_genome_dir)
         
         WITH_VG_CREATION = False # in any case we skip the VG creation step
         
@@ -370,7 +379,7 @@ def main(cmdLineargs = None):
     if not sat and len(deps_lack) > 0:
         raise DependencyException("\n\nERROR: The following dependencies are not sastisfied: " + 
                                     str(deps_lack) + 
-                                    "\nPlease solve them before running GRAFIMO")
+                                    "\nPlease, solve them before running GRAFIMO")
         die(1)
 
     elif not sat and len(deps_lack) <= 0:
