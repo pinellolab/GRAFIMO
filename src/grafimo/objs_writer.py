@@ -179,12 +179,37 @@ def getRegion_graph(region, genome_loc):
             raise Exception("Unable to locate genome " + genome_loc)
             die(1)
 
+        # extract the PNG image of the region
+        vg_region = ''.join([region, ".vg"])
+        cmd = "vg find -x {0} -E -p {1} > {2}".format(genome_loc, region, vg_region)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
+
+        dot_region = ''.join([region, ".dot"])
+        cmd = "vg view {0} -dp > {1}".format(vg_region, dot_region)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
+
         png_file = ''.join([region, '.png'])
+        cmd = "dot -Tpng {0} -o {1}".format(dot_region, png_file)
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
 
-        # extract the PNG image of region
-        cmd = "vg find -x {0} -p {1} | vg view -dp | dot -Tpng -o {2}".format(genome_loc, region, png_file)
+        # clean the directory from unused files
+        cmd = "rm *.vg"
         code = subprocess.call(cmd, shell = True)
+        if code != 0:
+            raise SubprocessException("Error while executing " + cmd)
+            die(1)
 
+        cmd = "rm *.dot"
+        code = subprocess.call(cmd, shell=True)
         if code != 0:
             raise SubprocessException("Error while executing " + cmd)
             die(1)
