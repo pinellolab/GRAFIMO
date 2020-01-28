@@ -1,5 +1,5 @@
 # Use the VG Docker image and build over it
-FROM quay.io/vgteam/vg:v1.20.0
+FROM quay.io/vgteam/vg:v1.21.0
 
 # Update Ubuntu Software repository
 RUN apt-get update
@@ -24,6 +24,7 @@ RUN apt-get install python3-pip -y
 RUN pip3 install pandas
 RUN pip3 install numpy
 RUN pip3 install statsmodels
+RUN pip3 install numba
 RUN pip3 install Cython
 
 # remove the pip installation file
