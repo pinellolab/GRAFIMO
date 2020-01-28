@@ -5,9 +5,13 @@
 @email: manu.tognon@gmail.com
 @email: manuel.tognon@studenti.univr.it
 
-Script that computes the scores, for each extracted sequence from the peak 
-defined in the bedfile and obtained from the genome graph, and saves the 
-results in a pandas DataFrame
+Scoring of the retrieved sequences.
+
+Each sequence o length L, where L is the length of the motif, 
+retrieved from the regions defined in the BED file, is scored 
+using the scoring matrix built from the input motif file.
+
+The running time of the algorithm used is bounded by O(n^2).
 
 """
 
@@ -15,18 +19,18 @@ import pandas as pd
 from . import motif as mtf
 from grafimo.GRAFIMOException import WrongPathException, ValueException, SubprocessException
 from grafimo.utils import die, printProgressBar
-from GRAFIMOscoring import score_seq
 import os
 import multiprocessing as mp
 import numpy as np
 import glob
 import subprocess
+from numba import jit
 from statsmodels.stats.multitest import multipletests
 
 def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     """
         Score the extracted sequences and save the results in a pandas 
-        DataFrame. A parallel computing approach is used.
+        DataFrame. 
         ----
         Parameters:
             subgraphs (str) : path to the subgraphs sequences
@@ -66,14 +70,14 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         
     scoringPathsMsg(no_reverse, motif)
         
-    if cores==0:
-        NCORES=mp.cpu_count()
+    if cores == 0:
+        NCORES = mp.cpu_count()
     else:
-        NCORES=cores
+        NCORES = cores
 
     assert NCORES > 0
         
-    cwd=os.getcwd()
+    cwd = os.getcwd()
     os.chdir(subgraphs)
         
     manager = mp.Manager()
@@ -81,23 +85,25 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     scannedNucsDict = manager.dict() # nucleotides scanned
     scannedSeqsDict = manager.dict() # sequences scanned
         
-    sgs=glob.glob('*.tsv')
-    sgs_splt=np.array_split(sgs, NCORES)
-    jobs=[]
-    proc_finished=0
+    sgs = glob.glob('*.tsv')
+    sgs_splt = np.array_split(sgs, NCORES)
+    jobs = []
+    proc_finished = 0
 
-    # run the processes in parallel
+    # run processes in parallel
     for i in range(NCORES):
-        p=mp.Process(target=score_subgraphs, args=(sgs_splt[i], motif, no_reverse, i, returnDict,
-                                                    scannedSeqsDict, scannedNucsDict))
+        p = mp.Process(target=score_subgraphs, args=(sgs_splt[i], motif, no_reverse, i, returnDict,
+                                                        scannedSeqsDict, scannedNucsDict))
         jobs.append(p)
         p.start() # start the process
             
+    printProgressBar(proc_finished, NCORES, prefix='Progress:',
+                            suffix='Complete', length=50)
     for job in jobs:
+        job.join() # deadlock
         proc_finished += 1
         printProgressBar(proc_finished, NCORES, prefix='Progress:',
-                            suffix='Complete', length=100)
-        job.join() # deadlock
+                            suffix='Complete', length=50)
             
     os.chdir(cwd)
         
@@ -121,6 +127,7 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     references = []
 
     for key in returnDict.keys():
+
         seqs += returnDict[key]['sequence'].to_list()
         scores += returnDict[key]['score'].to_list()
         seqnames += returnDict[key]['sequence_name'].to_list()
@@ -241,11 +248,12 @@ def allocate_array(value=None, size='0'):
 def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                         scannedSeqsDict, scannedNucsDict):
     """
-        Score the sequences extracted from the subgraphs
+        Score all the sequences contained in the extracted
+        subgraphs.
         ----
         Parameters:
             sgs (str) : path to the subgraphs
-            motif (Motif) : motif object
+            motif (Motif) : Motif object
             no_reverse (bool) : flag to consider only the forward strand or
                                 both the forard and reverse strands
             psid (int) : process ID of the scoring process, defined during the
@@ -259,6 +267,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
             None
     """
 
+    # get attributes to score the sequences
     scoreMatrix = motif.getMotif_scoreMatrix()
     pval_mat = motif.getMotif_pval_mat()
     minScore = motif.getMin_val()
@@ -266,9 +275,10 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     width = motif.getWidth()
     offset = motif.getOffset()
 
+    # lists for the final results 
     seqs = []
-    scores = []
-    pvalues = []
+    scores_final = []
+    pvalues_final = []
     seqnames = []
     chroms = []
     starts = []
@@ -280,12 +290,29 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
     
     for sg in sgs:
         
+        # get the sequences and their starting positions of the  
+        # current subgraph
         sg_data = pd.read_csv(sg, header = None, sep = '\t')
-        paths_num = len(sg_data.index)
+        seqs_sg = np.asarray(sg_data[1].to_list())
+        starts_sg = np.asarray(sg_data[2].to_list())
+
+        seqs_num = len(seqs_sg)
+
+        assert seqs_num == len(starts_sg)
         
-        for i in range(paths_num):
-            strand = sg_data.loc[i, 2][-1]
+        # score the sequences
+        scores, pvalues = score_sequences(seqs_sg, starts_sg, no_reverse, scoreMatrix, 
+                                            pval_mat, minScore, scale, width, offset, seqs_num)
+        scores_final += scores
+        pvalues_final += pvalues
+        
+        # get the remaining informations
+        for i in range(seqs_num):
+
+            strand = starts_sg[i][-1]
+
             if no_reverse:
+                # we are interested only in the sequences coming form the forward strand
                 if strand == '+': # is forward
                     seq = sg_data.loc[i, 1]
                     seqname = sg_data.loc[i, 0]
@@ -295,61 +322,165 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                     end = sg_data.loc[i, 3].split(':')[1]
                     end = end[:-1]
                     reference = sg_data.loc[i, 4]
-                    score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
-                                                width, offset)
-                    # forward strand
-
-                    seqs.append(seq)
-                    scores.append(score)
-                    pvalues.append(pvalue)
-                    seqnames.append(seqname)
-                    strands.append(strand)
-                    chroms.append(chrom)
-                    starts.append(start)
-                    ends.append(end)
-                    references.append(reference)
 
                     seqsScanned += 1
                         
             else:
-
+                # consider both strands
                 seq = sg_data.loc[i, 1]
                 seqname = sg_data.loc[i, 0]
                 chrom = seqname.split(':')[0]
-                start = sg_data.at[i, 2].split(':')[1]
+                start = sg_data.loc[i, 2].split(':')[1]
                 start = start[:-1]
                 end = sg_data.loc[i, 3].split(':')[1]
                 end = end[:-1]
                 reference = sg_data.loc[i, 4]
-                score, pvalue = score_seq(seq, scoreMatrix, pval_mat, minScore, scale,
-                                            width, offset)
-                seqs.append(seq)
-                scores.append(score)
-                pvalues.append(pvalue)
-                seqnames.append(seqname)
-                strands.append(strand)
-                chroms.append(chrom)
-                starts.append(start)
-                ends.append(end)
-                references.append(reference)
 
                 seqsScanned += 1
+               
+            seqs.append(seq)
+            seqnames.append(seqname)
+            strands.append(strand)
+            chroms.append(chrom)
+            starts.append(start)
+            ends.append(end)
+            references.append(reference)    
 
-                                   
+
+    # build the dataframe for the results got from the current process 
     summary = pd.DataFrame()
     summary['sequence_name'] = seqnames
     summary['chromosome'] = chroms
     summary['start'] = starts
     summary['end'] = ends
     summary['sequence'] = seqs
-    summary['score'] = scores
-    summary['pvalue'] = pvalues
+    summary['score'] = scores_final
+    summary['pvalue'] = pvalues_final
     summary['strand'] = strands
     summary['reference'] = references
     
+    # retrieve the final results summary
     returnDict[psid] = summary
     scannedSeqsDict[psid] = seqsScanned
     scannedNucsDict[psid] = seqsScanned * motif.getWidth() # in every sequence we have scanned motif_width nucleotides
+
+
+# here is used numba to achieve performances near to the ones 
+# obtained with a C program
+@jit(nopython = True)
+def score_sequences(seqs, starts, no_reverse, scoreMatrix, 
+                        pval_mat, minScore, scale, width, offset, seqs_num):
+    """
+        Scores each sequence contained in the list seqs, using the values 
+        defined in the score matrix, which were obtained from the 
+        input motif file.
+        ----
+        Parameters:
+            seqs (list) : list of DNA sequences to score
+            starts (list) : list of the starting positions 
+                            of the sequences contained in seqs
+            no_reverse (bool) : flag value to consider only
+                                sequences from the forward strand
+            scoreMatrix (np.ndarray) : scoring matrix 
+            pval_mat (np.array) : p-value matrix
+            minScore (np.double) : minimum score of the scoring
+                                    matrix
+            scale (int) : scale used during the scaling of the
+                            scoring matrix
+            width (int) : width of the motif
+            offset (np.double) : offset to retrieve the log 
+                                    likelihood score from the
+                                    scaled score
+            seqs_num (int) : number of the sequences to score
+        ----
+        Returns:
+            scores (list) : list of the scores of the sequences
+            pvalues (list) : list of the p-values of the 
+                                sequences  
+    """
+
+    scores = []
+    pvalues = []
+
+    # loop over every sequnce    
+    for i in range(seqs_num):
+
+        strand = starts[i][len(starts[i]) - 1] # get the strand
+
+        if no_reverse:
+            if strand == '+': # is forward
+                seq = seqs[i]
+                score = 0
+
+                seq_len = len(seq)
+
+                # score the current sequence
+                for i in range(seq_len):
+                    nuc = seq[i]
+
+                    if nuc == 'N':
+                        score = minScore
+                        break # we don't go further
+
+                    if nuc == 'A' or nuc == 'a':
+                        score += scoreMatrix[0, i]
+                    if nuc == 'C' or nuc == 'c':
+                        score += scoreMatrix[1, i]
+                    if nuc == 'G' or nuc == 'g':
+                        score += scoreMatrix[2, i]
+                    if nuc == 'T' or nuc == 't':
+                        score += scoreMatrix[3, i]
+
+                # get the p-value for the obtained score
+                tot = pval_mat.sum()
+                pvalue = (pval_mat[score:].sum())/tot
+
+                # retrieve the loglikelihood score
+                logodds = (score / scale) + (width * offset)
+                score = logodds
+                
+                scores.append(score)
+                pvalues.append(pvalue)
+        
+        else:
+
+            seq = seqs[i]
+            score = 0
+
+            seq_len = len(seq)
+
+            # score the current sequence
+            for i in range(seq_len):
+                nuc = seq[i]
+
+                if nuc == 'N':
+                    score = minScore
+                    break # we don't go further
+
+                if nuc == 'A' or nuc == 'a':
+                    score += scoreMatrix[0, i]
+                if nuc == 'C' or nuc == 'c':
+                    score += scoreMatrix[1, i]
+                if nuc == 'G' or nuc == 'g':
+                    score += scoreMatrix[2, i]
+                if nuc == 'T' or nuc == 't':
+                    score += scoreMatrix[3, i]
+
+            # get the p-value for the obtained score
+            tot = pval_mat.sum()
+            pvalue = (pval_mat[score:].sum())/tot
+
+            # retrieve the loglikelihood score
+            logodds = (score / scale) + (width * offset)
+            score = logodds
+                
+            scores.append(score)
+            pvalues.append(pvalue)
+        
+        # end if
+    # end for
+
+    return scores, pvalues
 
 
 def compute_qvalues(pvalues):
@@ -379,10 +510,10 @@ def compute_qvalues(pvalues):
 def buildDF(motif, seqnames, starts, ends, strands, 
                 scores, pvalues, qvalues, sequences, references, pvalueT):
     """
-        Build the dataframe summarizing the obtained results
+        Build the dataframe summary of the retrieved data
         ----
         Params:
-            motif (Motif) : motif object
+            motif (Motif) : Motif object
             seqnames (list) : list of the sequence names
             starts (list) : list of the starting positions of the hits
             ends (list) : list of the ending positions of the hits
@@ -437,7 +568,7 @@ def buildDF(motif, seqnames, starts, ends, strands,
         raise ValueException("The reference list must be of list type")
 
     # all lists must have the same length
-    LSTLEN=len(seqnames)
+    LSTLEN = len(seqnames)
 
     assert len(starts) == LSTLEN
     assert len(ends) == LSTLEN
@@ -447,9 +578,9 @@ def buildDF(motif, seqnames, starts, ends, strands,
     assert len(sequences) == LSTLEN
     assert len(references) == LSTLEN
 
-    # check if we have also the q-values
+    # check if we want also the q-values
     QVAL = False
-    if len(qvalues) > 0: # there are q-values
+    if len(qvalues) > 0: # we want the q-values
         QVAL = True
         assert len(qvalues) == LSTLEN
 
@@ -469,6 +600,7 @@ def buildDF(motif, seqnames, starts, ends, strands,
         pvalue = pvalues[idx]
 
         if pvalue < pvalueT:
+            # only the sequences with a p-vaue under the threshold survive
             seqnames_thresh.append(seqnames[idx])
             starts_thresh.append(starts[idx])
             ends_thresh.append(ends[idx])
@@ -484,8 +616,8 @@ def buildDF(motif, seqnames, starts, ends, strands,
     DFLEN = len(seqnames_thresh)
 
     # TF's name and ID list
-    motifIDs = [motif.getMotifID()]*DFLEN
-    motifNames = [motif.getMotifName()]*DFLEN
+    motifIDs = [motif.getMotifID()] * DFLEN
+    motifNames = [motif.getMotifName()] * DFLEN
 
     # build the final dataframe
     df = pd.DataFrame()
@@ -509,10 +641,12 @@ def buildDF(motif, seqnames, starts, ends, strands,
     # values are sorted by p-value
     df = df.sort_values(['p-value'], ascending=True)
 
-    df.index = list(range(1, DFLEN+1))
+    # reindex the dataframe in order to have indexes from 1 to DFLEN + 1
+    df.index = list(range(1, DFLEN + 1))
         
     return df
     
+
 def scoringPathsMsg(no_reverse, motif):
     
     if not isinstance(motif, mtf.Motif):
@@ -535,4 +669,3 @@ def scoringPathsMsg(no_reverse, motif):
     
     print() # newline
     
-        

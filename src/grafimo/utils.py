@@ -5,14 +5,16 @@
 @email: manu.tognon@gmail.com
 @email: manuel.tognon@studenti.univr.it
 
-The script contains definitions of custom Exceptions
-for GRAFIMO
+Utilities used in the different steps of GRAFIMO
+pipeline
 
 """
+
 
 import sys
 from shutil import which
 import numpy as np
+
 
 """
     definition of constant variables
@@ -24,6 +26,7 @@ LOG_FACTOR=1.44269504
 RANGE=1000
 CHROMS_LIST=[str(i) for i in range(1, 23)] + ['X', 'Y']
 EXT_DEPS = ['tabix', 'vg', 'dot']
+
 
 """
     functions from utils.py
@@ -41,6 +44,7 @@ def die(code):
 
     sys.exit(code)
 
+
 def isListEqual(lst1, lst2):
     """
         Compare two lists if they are equal
@@ -57,6 +61,31 @@ def isListEqual(lst1, lst2):
         return True
 
     return False
+
+
+def initialize_chroms_list(args_chroms, chroms_lst = CHROMS_LIST):
+    """
+        Initialize the list of chromosomes that will be 
+        considered by GRAFIMO, during its run.
+        ----
+        Parameters:
+            args_chroms (list) : chromosome list as it is obtained 
+                                    from the user input
+            chroms_lst (list) : list of all the chromosome 
+        ----
+        Returns:
+
+    """
+
+    chroms = [] # result variable
+
+    if not args_chroms:
+        chroms = chroms_lst
+    
+    else:
+        chroms = args_chroms
+
+    return chroms
 
 
 def check_deps():
@@ -151,6 +180,7 @@ def almost_equal(value1, value2, slope):
     else:
         return True
 
+
 def lg2(value):
     """
         C-like implementation of the log2 with a faster running time
@@ -208,28 +238,34 @@ def unique_lst(lst, size = None):
     return unique_lst
 
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '=', printEnd = "\r"):
     """
         Print the progress bar in the sequence scoring process and graph extraction
         process
         ----
         Parameters:
-            iteration (int)
-            total (int)
-            prefix (str)
-            suffix (str)
-            decimals (int)
-            length (int)
-            fill (str)
-            printEnd (str)
+            iteration (int) : fraction of work done
+            total (int) : total amount of work to do
+            prefix (str) : string to put in fornt of the bar
+            suffix (str) : string to put at the end of the bar
+            decimals (int) : number of digits after the dot, in the
+                                representation of the percentage of work done
+            length (int) : length of the bar
+            fill (str) : character with will be filled the bar
+            printEnd (str) : what will be done when the bar has been 
+                                completely printed
         ----
-        Returns
+        Returns:
             None
     """
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
-    # Print New Line on Complete
+    bar = fill * filledLength + ' ' * (length - filledLength) # "allocate space" for the bar
+    
+    # print the bar
+    print('\r%s [%s] %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
+    
+    # new line when the bar is completely filled
     if iteration == total:
         print()   
+

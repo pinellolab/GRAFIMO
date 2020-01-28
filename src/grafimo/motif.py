@@ -5,8 +5,8 @@
 @email: manu.tognon@gmail.com
 @email: manuel.tognon@studenti.univr.it
 
-The script defines the Motif class, that represents a motif and other functions
-to manage its construction 
+The file contains the definition of the Motif class, that represent
+the motif that will be searched on the genome.
 
 """
 
@@ -22,15 +22,16 @@ from grafimo.utils import die, DNA_ALPHABET, REV_COMPL, isListEqual, isJaspar_ff
 from motif_processing import readBGfile, get_uniformBG, apply_pseudocount_jaspar, apply_pseudocount_meme, \
                                 compute_log_odds, comp_pval_mat
 
-# define a motif object
 
+#################################################
+# begin Motif definition
+#################################################
 class Motif(object):
     """
         Class to represent a motif.
-        Are stored:
-            - the motif matrix
+        It contains:
+            - the motif count matrix
             - the motif scoring matrix (scaled)
-            - the reverse scoring matrix (scaled)
             - the pvalue matrix
             - parameters used to scale the matrix
             - the background distribution of the motif
@@ -41,20 +42,19 @@ class Motif(object):
             - the alphabet on which the matrix is built
     """
     
-    motif_matrix=None # pd.DataFrame
-    motif_scoreMatrix=None # pd.DataFrame
-    motif_scoreMatrix_rc=None # pd.DataFrame
-    motif_pval_matrix=None # pd.DataFrame
-    min_val=-np.inf # double
-    max_val=np.inf # double
-    scale=-1 # uint
-    offset=0 # double
-    bg=None # background distribution (dict)
-    width=-1
-    motifID='' # jaspar ID
-    motifName='' # common TF name
-    alphabet=None
-    isScaled=False
+    motif_matrix = None # pd.DataFrame
+    motif_scoreMatrix = None # np.ndarray
+    motif_pval_matrix = None # np.array
+    min_val = -np.inf # np.double
+    max_val = np.inf # np.double
+    scale = -1 # int
+    offset = 0 # np.double
+    bg = None # background distribution (dict)
+    width = -1 # int
+    motifID = '' # jaspar ID
+    motifName = '' # common TF name
+    alphabet = None
+    isScaled = False
     
     def __init__(self, motif_matrix, width, alphabet, motifID, motifName):
         
@@ -82,11 +82,11 @@ class Motif(object):
             raise NotValidAlphabetException("Cannot initialize a motif object with a wrong alphabet")
             die(1)
         
-        self.motif_matrix=motif_matrix
-        self.width=width
-        self.motifID=motifID
-        self.motifName=motifName
-        self.alphabet=alphabet
+        self.motif_matrix = motif_matrix
+        self.width = width
+        self.motifID = motifID
+        self.motifName = motifName
+        self.alphabet = alphabet
 
     ### setter methods ###
 
@@ -100,38 +100,33 @@ class Motif(object):
             raise NoDataFrameException("The given value is not a pandas.DatFrame instance")
             die(1)
 
-        self.motif_matrix=motif_matrix
+        self.motif_matrix = motif_matrix
             
     def setMotif_scoreMatrix(self, scoreMatrix):
-        
-        if scoreMatrix.empty:
-            raise NotValidMotifMatrixException("Attempt to add to the motif object an empty score matrix")
-            die(1)
             
-        if not isinstance(scoreMatrix, pd.DataFrame):
-            raise NoDataFrameException("The given value is not a pandas.DatFrame instance")
+        if not isinstance(scoreMatrix, np.ndarray) and \
+            not isinstance(scoreMatrix, pd.DataFrame):
+            raise ValueError("The given data structure is not an instance of numpy.ndarray or pandas.DataFrame")
             die(1)
 
-        self.motif_scoreMatrix=scoreMatrix
+        if isinstance(scoreMatrix, pd.DataFrame):
+            if scoreMatrix.empty:
+                raise NotValidMotifMatrixException("Attempt to add to the motif object an empty score matrix")
+                die(1)
 
-    def setMotif_scoreMatrix_rc(self, scoreMatrix_rc):
+        if isinstance(scoreMatrix, np.ndarray):
+            if scoreMatrix.size == 0:
+                raise NotValidMotifMatrixException("Attempt to add to the motif object an empty score matrix")
+                die(1)
 
-        if scoreMatrix_rc.empty:
-            raise NotValidMotifMatrixException("Attempt to add to the motif object an empty score matrix")
-            die(1)
-
-        if not isinstance(scoreMatrix_rc, pd.DataFrame):
-            raise NoDataFrameException("The given value is not a pandas.DatFrame instance")
-            die(1)
-
-        self.motif_scoreMatrix_rc=scoreMatrix_rc
+        self.motif_scoreMatrix = scoreMatrix
             
     def setMotif_pval_matrix(self, pval_mat):
 
-        if len(pval_mat)==0 or sum(pval_mat[:])<=0: # empty or not valid pvalue matrix
+        if len(pval_mat) == 0 or sum(pval_mat[:]) <= 0: # empty or not valid p-value matrix
             raise NotValidMotifMatrixException("The p-value matrix is not valid")
         
-        self.motif_pval_matrix=pval_mat
+        self.motif_pval_matrix = pval_mat
 
     def setMin_val(self, min_val):
 
@@ -139,7 +134,7 @@ class Motif(object):
             raise ValueException(' '.join(["Impossible to assign", min_val, "to Motif.min_val"]))
             die(1)
 
-        self.min_val=min_val
+        self.min_val = min_val
 
     def setMax_val(self, max_val):
 
@@ -147,7 +142,7 @@ class Motif(object):
             raise ValueException(' '.join(["Impossible to assign", max_val, "to Motif.max_val"]))
             die(1)
 
-        self.max_val=max_val
+        self.max_val = max_val
 
     def setScale(self, scale):
 
@@ -157,11 +152,11 @@ class Motif(object):
 
         assert scale > 0
 
-        self.scale=scale
+        self.scale = scale
 
     def setOffset(self, offset):
 
-        self.offset=offset
+        self.offset = offset
         
     def setBg(self, bgs):
 
@@ -169,15 +164,15 @@ class Motif(object):
             raise NotValidBGException("The background values are not in a dictionary")
             die(1)
 
-        self.bg=bgs
+        self.bg = bgs
               
     def setWidth(self, width):
         
-        if not isinstance(width, int) or width<=0:
+        if not isinstance(width, int) or width <= 0:
             raise WrongMotifWidthException("Trying to initialize motif with a not valid width")
             die(1)
 
-        self.width=width
+        self.width = width
         
     def setMotifID(self, motifID):
         
@@ -190,7 +185,7 @@ class Motif(object):
             raise WrongMotifIDException("Cannot add to the motif with an empty ID")
             die(1)
 
-        self.motifID=motifID
+        self.motifID = motifID
             
     def setMotifName(self, motifName):
         
@@ -203,7 +198,7 @@ class Motif(object):
             raise WrongMotifNameException("Cannot add to the motif an empty name")
             die(1)
 
-        self.motifName=motifName
+        self.motifName = motifName
             
     def setAlphabet(self, alphabet):
         
@@ -215,7 +210,7 @@ class Motif(object):
             raise NotValidAlphabetException("The alphabet given is not a valid DNA alphabet")
             die(1)
 
-        self.alphabet=alphabet
+        self.alphabet = alphabet
 
     def setIsScaled(self, isScaled):
 
@@ -223,7 +218,7 @@ class Motif(object):
             raise Exception("The isScaled value must be a boolean")
             die(1)
 
-        self.isScaled=isScaled
+        self.isScaled = isScaled
 
     ### getter methods ###
 
@@ -234,10 +229,6 @@ class Motif(object):
     def getMotif_scoreMatrix(self):
         
         return self.motif_scoreMatrix
-
-    def getMotif_scoreMatrix_rc(self):
-
-        return self.motif_scoreMatrix_rc
     
     def getMotif_pval_mat(self):
         
@@ -289,24 +280,32 @@ class Motif(object):
         minValue=motif_matrix.min().sum()
         self.minValue=minValue
 
+#################################################
+# end of Motif definition
+#################################################
 
-# functions to read the motif file and extract from it the score matrix
 
 def build_motif_JASPAR(motif_file, bg_file, pseudocount, no_reverse):
     """
-        Build the motif object, given a .jaspar motif file
+        Build a the Motif object starting from the raw counts
+        data stored in a given JASPAR file.
+
+        The raw counts are processed and the resulting values 
+        are used to define the scoring matrix of the motif
         ----
         Parameters:
             motif_file (str) : path to the motif file
             bg_file (str) : path to the background file
-            pseudocount (float) : value to add to the motif counts
-            no_reverse (bool) : boolean value that declares if we want also the
-                                reverse complement to be taken into account
+            pseudocount (float) : value to add to the motif counts (to avoid 
+                                    division by 0)
+            no_reverse (bool) : flag parameter to consider or not the reverse 
+                                complement building the Motif object
         ----
         Returns:
-            motif (Motif) : returns a Motif object
+            motif (Motif) : returns the corresponding Motif object
     """
 
+    # This shouldn't happen
     if not motif_file:
         raise MissingFileException("The motif file is missing")
         die(1)
@@ -319,17 +318,18 @@ def build_motif_JASPAR(motif_file, bg_file, pseudocount, no_reverse):
     assert pseudocount > 0
 
     # read the motif file
-    motif=read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse)
+    motif = read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse)
 
     # get the log-odds matrix
-    motif_log_odds=compute_log_odds(motif.getMotif_matrix(), motif.getWidth(),
+    motif_log_odds = compute_log_odds(motif.getMotif_matrix(), motif.getWidth(),
                                         motif.getBg(), motif.getAlphabet())
     motif.setMotif_scoreMatrix(motif_log_odds)
 
     # scale the log-odds scores
-    scaled_scores, min_val, max_val, scale, offset=scale_pwm(motif.getMotif_scoreMatrix(),
+    scaled_scores, min_val, max_val, scale, offset = scale_pwm(motif.getMotif_scoreMatrix(),
                                                                 motif.getAlphabet(),
                                                                 motif.getWidth())
+
     motif.setMotif_scoreMatrix(scaled_scores)
     motif.setIsScaled(True)
     motif.setScale(scale)
@@ -338,68 +338,71 @@ def build_motif_JASPAR(motif_file, bg_file, pseudocount, no_reverse):
     motif.setOffset(offset)
 
     # compute the p-value matrix
-    pval_mat=comp_pval_mat(motif)
+    pval_mat = comp_pval_mat(motif)
     motif.setMotif_pval_matrix(pval_mat)
+
+    motif.setMotif_scoreMatrix(scaled_scores.values) # store the np.ndarray of the score matrix
             
     return motif
 
+
 def read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse):
     """
-        Read the motif file in JASPAR format and build a motif
+        Read the data contained in a JASPAR file and build a motif
         object from it
         ----
         Params:
             motif_file (str) : path to the motif file (in JASPAR format)
             bg_file (str) : path to the background file
-            no_reverse (bool) : boolean value that declares if we want also the
-                                reverse complement to be taken into account
+            no_reverse (bool) : flag parameter to consider or not the reverse 
+                                complement building the Motif object
         ----
         Returns:
-            motif (Motif) : motif object built from the data in motif_file
+            motif (Motif) : Motif object built from the data in motif_file
     """
 
-    nucs=[]
-    counts=[]
+    nucs = []
+    counts = []
 
     try:
-        mf=open(motif_file, mode='r')  # open the file in read only mode
+        mf = open(motif_file, mode='r')  # open the file in read only mode
 
-        header=str(mf.readline()[1:])  # read the header
+        header = str(mf.readline()[1:])  # read the header
         motifID, motifName = header.split('\t')[0:2]  # get the jaspar ID and the common TF name
-        motifName=motifName[:-1]  # avoid '\n'
+        motifName = motifName[:-1]  # avoid '\n'
 
         for line in mf:
-            line=line.strip()
-            nuc=line.strip()[:1]
-            count=list(map(float, line.strip()[1:].split()[1:][:-1]))
+            line = line.strip()
+            nuc = line.strip()[:1]
+            count = list(map(float, line.strip()[1:].split()[1:][:-1]))
 
             nucs.append(nuc)
             counts.append(count)
 
     except:  # something went wrong
-        msg=' '.join(["Unable to read file", motif_file])
+        msg = ' '.join(["Unable to read file", motif_file])
         raise FileReadingException(msg)
         die(1)
 
     else:
 
-        motif_counts=pd.DataFrame(data=counts, index=nucs)  # raw counts
-        motif_width=int(len(motif_counts.columns))
-        alphabet=sorted(nucs)
+        motif_counts = pd.DataFrame(data=counts, index=nucs)  # raw counts
+        motif_width = int(len(motif_counts.columns))
+        alphabet = sorted(nucs)
 
         if bg_file:
-            bgs=readBGfile(bg_file)
+            bgs = readBGfile(bg_file)
         else:
-            bgs=get_uniformBG(alphabet)
+            bgs = get_uniformBG(alphabet)
 
-        bgs=pseudo_bg(bgs, no_reverse)
+        bgs = pseudo_bg(bgs, no_reverse)
 
-        motif_probs=(motif_counts / motif_counts.sum(0))  # get probabilities
-        motif_probs=norm_motif(motif_probs, motif_width, alphabet)
-        motif_probs=apply_pseudocount_jaspar(motif_counts, motif_probs, pseudocount, bgs,
-                                              motif_width, alphabet)
+        motif_probs = (motif_counts / motif_counts.sum(0))  # get probabilities
+        motif_probs = norm_motif(motif_probs, motif_width, alphabet)
+        motif_probs = apply_pseudocount_jaspar(motif_counts, motif_probs, pseudocount, bgs,
+                                                motif_width, alphabet)
 
-        motif=Motif(motif_probs, motif_width, alphabet, motifID, motifName)
+        motif = Motif(motif_probs, motif_width, alphabet, motifID, motifName)
         motif.setBg(bgs)
 
         return motif
@@ -410,19 +413,25 @@ def read_JASPAR_motif(motif_file, bg_file, pseudocount, no_reverse):
 
 def build_motif_MEME(motif_file, bg_file, pseudocount, no_reverse):
     """
-        Build the motif object, given a .jaspar motif file
+        Build a the Motif object starting from the probabilities
+        stored in a given MEME file.
+
+        The probabilities are processed and the resulting values 
+        are used to define the scoring matrix of the motif.
         ----
         Parameters:
             motif_file (str) : path to the motif file
             bg_file (str) : path to the background file
             pseudocount (float) : value to add to the motif counts
-            no_reverse (bool) : boolean value that declares if we wnat also the
-                                reverse complement to be taken into account
+            no_reverse (bool) : flag parameter to consider or not the reverse 
+                                complement building the Motif object
         ----
         Returns:
-            motif (Motif) : returns a Motif object
+            motif (Motif) : Motif object built from data contained in
+                            motif_file
     """
 
+    # This shouldn't happen
     if not motif_file:
         raise MissingFileException("The motif file is missing")
         die(1)
@@ -448,7 +457,7 @@ def build_motif_MEME(motif_file, bg_file, pseudocount, no_reverse):
         m.setMotif_scoreMatrix(motif_log_odds)
 
         # scale the log-odds scores
-        scaled_scores, min_val, max_val, scale, offset=scale_pwm(m.getMotif_scoreMatrix(),
+        scaled_scores, min_val, max_val, scale, offset = scale_pwm(m.getMotif_scoreMatrix(),
                                                                     m.getAlphabet(),
                                                                     m.getWidth())
         m.setMotif_scoreMatrix(scaled_scores)
@@ -459,8 +468,10 @@ def build_motif_MEME(motif_file, bg_file, pseudocount, no_reverse):
         m.setOffset(offset)
 
         # compute the p-value matrix
-        pval_mat=comp_pval_mat(m)
+        pval_mat = comp_pval_mat(m)
         m.setMotif_pval_matrix(pval_mat)
+
+        m.setMotif_scoreMatrix(scaled_scores.values) 
 
         complete_motifs.append(m)
 
@@ -478,11 +489,11 @@ def read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse):
             motif_file (str) : path to the motif file
             bg_file (str) : path to the background file
             pseudocount (np.double) : pseudocount to apply to the motif
-            no_reverse (bool) : boolean value that declares if we wnat also the
-                                reverse complement to be taken into account
+            no_reverse (bool) : flag parameter to consider or not the reverse 
+                                complement building the Motif object
         ----
         Returns:
-            motif (Motif) returns a Motif object
+            motif (Motif) : returns a Motif object
     """
 
     try:
@@ -619,10 +630,10 @@ def read_MEME_motif(motif_file, bg_file, pseudocount, no_reverse):
 
 def scale_pwm(motif_matrix, alphabet, motif_width):
     """
-        Computes the scaled matrix, given a motif matrix
+        Scale the motif matrix values
         ----
         Parameters:
-            motif_matrix (str) : pat to the motif file
+            motif_matrix (str) : path to the motif file
             alphabet (str) : alphabet of the motif
             motif_width (int) : width of the motif
         ----
@@ -648,29 +659,29 @@ def scale_pwm(motif_matrix, alphabet, motif_width):
 
     assert motif_width > 0
 
-    min_val=min(motif_matrix.min())
-    max_val=max(motif_matrix.max())
-    motif_matrix_sc=pd.DataFrame(index=list(motif_matrix.index), columns=list(motif_matrix.columns),
-                                        data=0)
+    min_val = min(motif_matrix.min())
+    max_val = max(motif_matrix.max())
+    motif_matrix_sc = pd.DataFrame(index=list(motif_matrix.index), columns=list(motif_matrix.columns),
+                                    data=0)
 
-    lower=min_val
+    lower = min_val
     upper = max_val
         
     if lower == upper: # all values are equal
-        lower=np.double(upper-1)
+        lower = np.double(upper-1)
         
-    lower=np.floor(lower)
-    offset=np.round(np.floor(lower))
-    scale_factor=np.floor(RANGE/(upper-lower))
+    lower = np.floor(lower)
+    offset = np.round(np.floor(lower))
+    scale_factor = np.floor(RANGE/(upper-lower))
 
     # values will be in [0, 1000]
     for nuc in alphabet:
         for j in range(motif_width):
-            scaled_score=np.round((motif_matrix.loc[nuc, j]-(offset))*scale_factor)
-            motif_matrix_sc.loc[nuc, j]=scaled_score
+            scaled_score = np.round((motif_matrix.loc[nuc, j]-(offset))*scale_factor)
+            motif_matrix_sc.loc[nuc, j] = scaled_score
     
     # make sure the values are integers
-    motif_matrix_sc[:]=motif_matrix_sc[:].astype(int)
+    motif_matrix_sc[:] = motif_matrix_sc[:].astype(int)
 
     # now they are scaled
     min_val = min(motif_matrix_sc.min())
@@ -681,17 +692,18 @@ def scale_pwm(motif_matrix, alphabet, motif_width):
 
 def get_motif_pwm(motif_file, bgs, pseudo, no_reverse):
     """
-        Pipeline to build the motif object
+        Build the Motif object starting from the given PWM
         ----
         Parameters:
             motif_file (str) : path to the motif file
             bgs (str) : path to the background file
-            pseudo (float) : value to add to the motif counts
-            no_reverse (bool) : flag that says if has to be taken into account 
-                                also the reverse complement
+            pseudo (float) : value to add to the motif counts (to avoid division 
+            by 0)
+            no_reverse (bool) : flag parameter to consider or not the reverse 
+                                complement building the Motif object
         ----
         Returns:
-            motif (Motif) : motif object
+            motif (Motif) : Motif object
     """
 
     if not motif_file:
@@ -718,9 +730,10 @@ def get_motif_pwm(motif_file, bgs, pseudo, no_reverse):
 
     return motif
 
+
 def pseudo_bg(bgs, no_reverse):
     """ 
-        Apply a pseudo count to the background frequencies
+        Apply the pseudo count to the background frequencies
         ----
         Parameters:
             bgs (dict) : dictionary of the background probabilities
@@ -738,14 +751,15 @@ def pseudo_bg(bgs, no_reverse):
         die(1)
         
     if not no_reverse:
-        bgs_avg=average_bg_with_rc(bgs)
+        bgs_avg = average_bg_with_rc(bgs)
     else:
-        bgs_avg=bgs
+        bgs_avg = bgs
         
-    bgs_proc=norm_bg(bgs_avg)
+    bgs_proc = norm_bg(bgs_avg)
 
     return bgs_proc
         
+
 def average_bg_with_rc(bgs):
     """
         Average the background frequencies with the reverse complement
@@ -757,21 +771,22 @@ def average_bg_with_rc(bgs):
             bgs_avg (dict) : averaged background probabilities
     """
 
-    bgs_avg={}
+    bgs_avg = {}
     
     for nuc in bgs.keys():
-        rc=REV_COMPL[nuc]
+        rc = REV_COMPL[nuc]
 
-        if REV_COMPL[rc]==nuc and ord(nuc) < ord(rc):
-            avg_freq=np.double((bgs[nuc]+bgs[rc])/np.double(2))
+        if REV_COMPL[rc] == nuc and ord(nuc) < ord(rc):
+            avg_freq = np.double((bgs[nuc]+bgs[rc])/np.double(2))
             bgs_avg.update({nuc: avg_freq})
             bgs_avg.update({rc:avg_freq})
             
     return bgs_avg
 
+
 def norm_bg(bgs):
     """
-        Normalize the bakground frequencies
+        Normalize the background frequencies
         ----
         Parameters:
             Parameters:
@@ -781,35 +796,29 @@ def norm_bg(bgs):
             bgs_norm (dict) : normalized background probabilities
     """
     
-    PSEUDO=np.double(0.0000005) # pseudocount
+    PSEUDO = np.double(0.0000005) # pseudocount
 
-    alphabet=sorted(list(bgs.keys()))
-    tot=np.double(len(alphabet)*PSEUDO)
-    bgs_norm={}
+    alphabet = sorted(list(bgs.keys()))
+    tot = np.double(len(alphabet)*PSEUDO)
+    bgs_norm = {}
     
     for nuc in bgs.keys():
-        tot+=np.double(bgs[nuc])
+        tot += np.double(bgs[nuc])
 
     assert tot > 0
         
     for nuc in bgs.keys():
-        prob=np.double((bgs[nuc]+PSEUDO)/tot)
+        prob = np.double((bgs[nuc]+PSEUDO)/tot)
         bgs_norm.update({nuc : prob})
         
-    tot=np.double(0)
+    tot = np.double(0)
     for nuc in bgs.keys():
-        tot+=bgs[nuc]
+        tot += bgs[nuc]
     
-    assert tot!=0
-    
-#    if almost_equal(1, tot, 0):
-#        print("is almost equal")
-#        return bgs_norm
-#    else:
-#        for nuc in bgs.keys():
-#            bgs_norm[nuc]=np.double(bgs_norm[nuc]/tot)
+    assert tot != 0
             
     return bgs_norm
+
 
 def norm_motif(motif_probs, motif_width, alphabet):
     """
@@ -824,20 +833,20 @@ def norm_motif(motif_probs, motif_width, alphabet):
             motif_probs (pd.DataFrame) : normalized probability matrix
     """
     
-    tolerance=0.00001 # allowed tolerance in the difference between the position
-                      # probability and 1
+    tolerance = 0.00001 # allowed tolerance in the difference between the position
+                        # probability and 1
                       
     for j in range(motif_width):
-        tot=np.double(0)
+        tot = np.double(0)
 
         for nuc in alphabet:
-            tot+=motif_probs.loc[nuc, j]
+            tot += motif_probs.loc[nuc, j]
 
         assert tot != 0
             
         if not almost_equal(1, tot, tolerance):
             for nuc in alphabet:
-                motif_probs.loc[nuc, j]=np.double(motif_probs.loc[nuc, j]/tot)
+                motif_probs.loc[nuc, j] = np.double(motif_probs.loc[nuc, j]/tot)
                 
     return motif_probs
 

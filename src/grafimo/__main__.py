@@ -1,29 +1,56 @@
+#!/usr/bin/env python
+# MIT License
+#
+# Copyright (c) 2020 InfOmics
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 """
 
 GRAFIMO version {version}
 
-Copyright (C) 2019 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@studenti.univr.it>
+Copyright (C) 2020 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@studenti.univr.it>
 
 GRAph-based Find Individual Motif Occurrences scores sequences likely to be 
-transcription factor binding sites in ChIP-seq narrow peaks
+transcription factor binding sites from ChIP-seq narrow peaks data.
 
 Usage:
     grafimo --linear-genome LINEAR-GENOME --vcf VCF --bedfile BEDFILE --motif MOTIF [options]
-    
-    grafimo --graph-genome GRAPH-GENOME --bedfile BEDFILE --motif MOTIF [options]
 
     grafimo --graph-genome-dir PATH-TO-GRAPH-GENOME --bedfile BEDFILE --motif MOTIF [options]
-    
-The tool takes in input a linear genome (in FA or FASTA format) and a VCF file
-(must be compressed, e.g. vcf-file.vcf.gz) to construct your own graph genomes,
-or a complete graph_genome (better if in XG format), or a set of graph genomes (one for each
-chromosome); the latter option is suggested to run GRAFIMO on your laptop.
-The results will be written in the directory specified by the user
-(--out option or default value 'grafimo_out') and they are made of a TSV file, a
-GFF file and an HTML version of the TSV.
 
-The tool is also error tolerant in the subgraphs extraction, since it doesn't
-stop its execution although we can have some exceptions.
+    grafimo --graph-genome GRAPH-GENOME --bedfile BEDFILE --motif MOTIF [options]
+    
+Construct the variation graph from a linear reference genome and your own VCF file.
+The genome is splitted in the 23 chromosomes (a graph for each chromosome will be built).
+From the genome graphs get all the sequences contained in the regions defined in your 
+BED file.
+If you have a pre-built genome graph, the scanning can be done on it; the scanning can also 
+be done on a set of genome graphs, assuming that each genome graph represent a single chromosome,
+by giving the directory were they are stored. Note that the latter approach (that is the one used
+by the full pipeline) has shown the best performances.
+The results will be written in a directory, named grafimo_out_PID_TFCode; in the directory you'll
+find three files: 
+    - grafimo_out.csv
+    - grafimo_out.html
+    - grafimo_out.gff
 
 Citation:
     
@@ -31,6 +58,7 @@ Citation:
     
     
 Run 'grafimo --help'to see all command-line options.
+
 See https://github.com/pinellolab/GRAFIMO or https://github.com/InfOmics/GRAFIMO for the full documentation.
 
 """
@@ -38,7 +66,7 @@ See https://github.com/pinellolab/GRAFIMO or https://github.com/InfOmics/GRAFIMO
 from argparse import ArgumentParser, SUPPRESS, HelpFormatter
 from grafimo.grafimo import __version__, with_vg_pipeline, without_vg_pipeline
 from grafimo.GRAFIMOException import DependencyException, VGException, PipelineException
-from grafimo.utils import die, check_deps, EXT_DEPS
+from grafimo.utils import die, check_deps, initialize_chroms_list, EXT_DEPS
 import time
 import sys
 import os
@@ -50,7 +78,7 @@ import grafimo.vgCreation as vgc
 class GRAFIMOArgumentParser(ArgumentParser):
     """
     
-        This redefinition of the arguments parser:
+        This is a redefinition of the arguments parser:
             - The usage message is not prefixed by 'usage'
             - A brief message is printed instead of the full usage message
     
@@ -73,23 +101,55 @@ class GRAFIMOArgumentParser(ArgumentParser):
         sys.stderr.write("Run 'grafimo --help' to see the usage\n")
         self.exit(2, "\n{0}: ERROR: {1}\n".format(self.prog, msg))
         
+
 class CmdError(Exception):
     pass
 
+
+class Pipeline(object):
+    """
+        Generic pipeline object
+    """
+    def __init__(self):
+        pass
+
+
+class withVGCreationPipeline(Pipeline):
+    """
+        Object to represent the pipeline with 
+        the creation of the genome graphs
+    """
+    pass
+
+
+class onlyMotifScanningPipeline(Pipeline):
+    """
+        Object to represent the pipeline that
+        does only the motif scanning on the given 
+        genome graph(s)
+    """
+    pass
+
+
 def get_AP():
     """
-        Return the parser containing the input arguments
+        Get the arguments from the command-line call of 
+        GRAFIMO and return the parser containing all the input arguments
         ----
         Parameters:
             None
         ----
-        Returns:
+        Return:
             parser (GRAFIMOArgumentParser)
     
     """
     
+    # define the parser
     parser = GRAFIMOArgumentParser(usage=__doc__, add_help=False)
    
+    #####################################################################
+    # start reading the arguments
+    #####################################################################
     group = parser.add_argument_group("Options")
     group.add_argument("-h", "--help", action="help", help="Show the help message and exit")
     group.add_argument("--version", action="version", help="Show the version and exit", version=__version__)
@@ -99,7 +159,11 @@ def get_AP():
                                 "option is to use only one core to avoid memory issues; if you are running "
                                 "GRAFIMO on a machine with RAM >= 128 GB maybe you can use more cores")
     
-    # the following arguments depend on the user approach
+    #######################
+    # mandatory arguments
+    #######################
+
+    # the following arguments depend on the user approach (only motif scanning || genome graph creation + motif scanning)
     group.add_argument("-l", "--linear-genome", type=str, help='Path to the linear genome (fasta format required)',
                            nargs='?', default='', metavar='LINEAR-GENOME', dest='linear_genome')
     group.add_argument("-c", "--chroms", type=str, nargs='*',
@@ -121,7 +185,9 @@ def get_AP():
                            help='Path to the motif file to use for the scoring of the '
                                 'sequences (JASPAR or MEME format required)')
     
+    ######################
     # optional arguments
+    ######################
     group.add_argument("-k", "--bgfile", type=str,
                         help='Path to a file which defines the background distribution [optional]', nargs='?',
                         const='', default='', metavar='BACKGROUND')
@@ -157,29 +223,63 @@ def get_AP():
     
     return parser
 
+
+def guess_pipeline_from_args(args):
+    """
+        Return the pipeline to follow from the input
+        arguments
+        ----
+        Parameters:
+            - args (GRAFIMOArgumentParser)
+        ----
+        Return:
+            - pipeline (str)
+    """
+
+    pipeline = None
+
+    if args.linear_genome and args.vcf:
+        pipeline = withVGCreationPipeline()
+    
+    if args.graph_genome_dir or args.graph_genome:
+        pipeline = onlyMotifScanningPipeline()
+
+    return pipeline
+
+
 def main(cmdLineargs = None):
     """
     
-        Main function of the tool
+        Main function of GRAFIMO.
+
+        The arguments given in input are checked for consistency,
+        then a pipeline is followed.
+
         ----
         Parameters:
-            cmdLineArgs (str) : the arguments given in command line 
+            cmdLineArgs (str) 
         ----
         Returns:
             None
     
     """
 
-    start = time.time() # compute elapsed time
-
-    WITH_VG_CREATION = False
+    start = time.time() # the run begin here
     
+    # read command-line arguments
     parser = get_AP()
+
     if cmdLineargs is None:
         cmdLineargs = sys.argv[1:] # take input args
         
     args = parser.parse_args(args = cmdLineargs)
     
+    #####################################################
+    # checking arguments consistency
+    #####################################################
+
+    # and a long series of if ..  else begins
+    # good luck !!!
     if not args.linear_genome and not args.graph_genome and not args.graph_genome_dir:
         parser.error("Needed at least one between '--linear_genome --vcf [other args]', '--graph_genome [other args]' and '--graph_genome_dir [other args]'")
         
@@ -208,15 +308,20 @@ def main(cmdLineargs = None):
         parser.error('The number of cores cannot be negative')
         
     if args.cores == 0:
-        cores = mp.cpu_count() # take all the CPUs available
+        cores = mp.cpu_count() # take all the available CPUs
 
     elif args.cores == 0 and args.graph_genome:
-        cores = 1 # the default if we make a query on the whole genome is 1 core
-                  # this slow doen a lot the query process but is useful to avoid
+        cores = 1 # the default, if we make work with a whole genome-graph is 1 core
+                  # this slows down a lot the region query process but we are sure to avoid
                   # memory problems
+                  # 
+                  # ****
+                  # If you call more cores querying the whole genome graph 
+                  # BE SURE TO HAVE > 128 GB of RAM !!!!!!
+                  # ****
         
     else:
-        cores=args.cores
+        cores = args.cores
         
     if args.linear_genome:
         if  (args.linear_genome.split('.')[-1] != 'fa' and \
@@ -229,14 +334,11 @@ def main(cmdLineargs = None):
             if len(glob.glob(linear_genome)) != 1:
                 parser.error('Cannot find the specified linear genome file')
 
-            # get the absolute path to the linear genome
+            # it's safer to get the absolute path to the linear genome
             linear_genome = os.path.abspath(linear_genome)
             
-    if args.chroms:
-        chroms = args.chroms
-        
-    else:
-        chroms = []
+    # working with the chromosomes list
+    chroms = initialize_chroms_list(args.chroms)
             
     if args.vcf:
         if args.vcf.split('.')[-1] != 'gz' or \
@@ -248,10 +350,8 @@ def main(cmdLineargs = None):
             if len(glob.glob(vcf)) <= 0:
                 parser.error('Cannot find the specified VCF file')
 
-            # get the absolute path to the VCF
+            # it's safer to get the absolute path to the VCF
             vcf = os.path.abspath(vcf)
-            
-            WITH_VG_CREATION = True
             
     if args.graph_genome:
         if (args.graph_genome.split('.')[-1] != 'xg' and \
@@ -264,7 +364,6 @@ def main(cmdLineargs = None):
         else:
             graph_genome = args.graph_genome
             graph_genome = os.path.abspath(graph_genome)
-            WITH_VG_CREATION = False
             
     if args.graph_genome_dir:
         if (not os.path.isdir(args.graph_genome_dir)):
@@ -280,8 +379,6 @@ def main(cmdLineargs = None):
             parser.error('No xg file found in the specified directory')
 
         graph_genome_dir = os.path.abspath(graph_genome_dir)
-        
-        WITH_VG_CREATION = False # in any case we skip the VG creation step
         
     if args.bedfile:
         if args.bedfile.split('.')[-1] != 'bed':
@@ -305,7 +402,7 @@ def main(cmdLineargs = None):
         # check if the given motifs exist
         for m in motifs:
             if len(glob.glob(m)) <= 0:
-                parser.error('Cannot motif file: ' + m)
+                parser.error('Cannot find motif file: ' + m)
         
     if args.bgfile:
         bgfile = args.bgfile # we have a path to the bg file
@@ -314,7 +411,7 @@ def main(cmdLineargs = None):
             parser.error('Cannot find the specified background file')
 
     else:
-        bgfile = args.bgfile # empty string
+        bgfile = args.bgfile # empty string => uniform distribution
         
     if args.pseudo <= 0:
         parser.error('The pseudocount cannot be less than or equal 0')
@@ -354,7 +451,12 @@ def main(cmdLineargs = None):
 
     if dest == 'grafimo_out': # default option
         # to make unique the output directory we add the PID
-        # to the name
+        # to the name.
+        #
+        # This is useful when calling grafimo in different runs on the 
+        # same machine.
+        #
+        # believe me, this can happen
         dest = ''.join([dest, '_', str(os.getpid())])
 
     if args.top_graphs < 0:
@@ -391,17 +493,21 @@ def main(cmdLineargs = None):
 
     # the dependency check was OK
 
-    if WITH_VG_CREATION:
-        
+    # choose the pipeline from the arguments
+    pipeline = guess_pipeline_from_args(args)
+
+    if pipeline == None:
+        raise PipelineException("Don't know which pipeline to follow")
+
+    if isinstance(pipeline, withVGCreationPipeline):
         if verbose:
             print("\nEntering the pipeline with the variation graph creation\n")
 
         with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
                             pseudocount, pvalueT, no_reverse, qvalue, text_only, dest,
-                            top_graphs, WITH_VG_CREATION, verbose)
+                            top_graphs, True, verbose)
         
-        
-    elif not WITH_VG_CREATION:
+    elif isinstance(pipeline, onlyMotifScanningPipeline):
 
         if verbose:
             print("\nEntering the pipeline without the variation graph creation\n")
@@ -413,9 +519,10 @@ def main(cmdLineargs = None):
                 raise VGException("The genome graph must be in VG or XG format")
                 die(1)
         
-            elif graph_genome.split('.')[-1] == 'vg': # we are given a vg genome
+            elif graph_genome.split('.')[-1] == 'vg': 
+                # we are given a vg genome, then we have to index it
                 vg = graph_genome
-                xg = vgc.indexVG(vg)
+                vgc.indexVG(vg)
             
             else: # we are given an xg genome
                 xg = graph_genome
@@ -424,25 +531,25 @@ def main(cmdLineargs = None):
                 print("The graph " + xg + " will be queried\n")
         
             without_vg_pipeline(cores, xg, bedfile, motifs, bgfile, pseudocount, 
-                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, WITH_VG_CREATION)
+                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, False)
             
         elif args.graph_genome_dir:
             
-            gplus=True # defines if the input is a single xg or more than one
+            gplus = True # defines if the input is a single xg or more than one
 
             if verbose:
                 print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
             
             without_vg_pipeline(cores, graph_genome_dir, bedfile, motifs, bgfile, pseudocount,
-                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, WITH_VG_CREATION, gplus, chroms)
+                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, False, gplus, chroms)
             
     else:
         # error in the pipeline flag
-        msg="\n\nWrong input. Unable to determine which pipeline to follow"
+        msg = "\n\nWrong input. Unable to determine which pipeline to follow"
         raise PipelineException(msg)
         die(1)
         
-    end=time.time()
+    end = time.time() # the run  ends here
     
     print('\nelapsed time', end-start)
     

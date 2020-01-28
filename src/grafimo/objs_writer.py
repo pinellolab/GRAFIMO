@@ -33,7 +33,7 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
     
     if not os.path.isdir(dest): # tthe directory not exist
     
-        cmd='mkdir {0}'.format(dest) # create the out directory
+        cmd='mkdir -p {0}'.format(dest) # create the out directory
         code=subprocess.call(cmd, shell=True)
     
         if code!=0:
@@ -44,7 +44,7 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
         os.chdir(dest)
             
     else:
-        os.chdir(dest) # for some reason it exists
+        os.chdir(dest) # for some unknown reason it exists
         
         # the content will be automatically rewritten
     
@@ -179,6 +179,8 @@ def getRegion_graph(region, genome_loc):
             raise Exception("Unable to locate genome " + genome_loc)
             die(1)
 
+        png_file = ''.join([region, '.png'])
+            
         # extract the PNG image of the region
         vg_region = ''.join([region, ".vg"])
         cmd = "vg find -x {0} -E -p {1} > {2}".format(genome_loc, region, vg_region)

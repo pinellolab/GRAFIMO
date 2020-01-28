@@ -343,6 +343,7 @@ def compute_log_odds(probs_matrix, width, bgs, alphabet):
 
     return ccompute_log_odds(probs_matrix, width, bgs, alphabet)
 
+
 ### DP p-value matrix computation ###
 cdef ccomp_pval_mat(motif):
     """
@@ -377,7 +378,7 @@ cdef ccomp_pval_mat(motif):
     alphabet=motif.getAlphabet()
     bgs=motif.getBg()
 
-    pval_mat=np.zeros((width, RANGE*width + 1))
+    pval_mat=np.zeros((width, RANGE * width + 1))
 
     for pos in range(width):
         for nuc in alphabet:
