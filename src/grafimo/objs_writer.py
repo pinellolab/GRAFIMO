@@ -14,8 +14,9 @@ import sys
 import os
 import subprocess
 import pandas as pd
+import numpy as np
 from grafimo.GRAFIMOException import ValueException, SubprocessException, NoDataFrameException, FileReadingException
-from grafimo.utils import die, unique_lst
+from grafimo.utils import PHASE, TP, SOURCE, die, unique_lst, list_data
 
 def writeresults(objs, dest, motifID, top_graphs, genome_loc):
     
@@ -27,16 +28,16 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
         raise Exception("Empty results list. Cannot proceed")
         die(1)
         
-    cwd=os.getcwd()
+    cwd = os.getcwd()
 
     dest = '_'.join([dest, motifID])
     
     if not os.path.isdir(dest): # tthe directory not exist
     
-        cmd='mkdir -p {0}'.format(dest) # create the out directory
-        code=subprocess.call(cmd, shell=True)
+        cmd = 'mkdir -p {0}'.format(dest) # create the out directory
+        code = subprocess.call(cmd, shell=True)
     
-        if code!=0:
+        if code != 0:
             raise SubprocessException(' '.join(["An error occurred while executing", cmd,
                                                     ". Exiting"]))
             die(1)
@@ -54,7 +55,7 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
     for obj in objs:
         
         if isinstance(obj, pd.DataFrame):
-            df=obj
+            df = obj
             
             # write the tsv
             df.to_csv('grafimo_out.tsv', sep='\t', encoding='utf-8')
@@ -118,16 +119,20 @@ def writeGFF3(data):
         die(1)
         
     try:
-        f=open("grafimo_out.gff", mode='w+')
+        f = open("grafimo_out.gff", mode='w+')
     
-        header="##gff-version 3\n"
+        header = "##gff-version 3\n"
         f.write(header)
-    
-        data_idxs=list(data.index)
+
+        data_list = list_data(data)
+        data_list_size = len(data_list[0])
+
+        #data_idxs = list(data.index)
         
-        for idx in data_idxs:
-            
-            seqname=data.loc[idx, 'sequence_name'].split(':')[0] # takes only the chromosome
+        #for idx in data_idxs:
+        for i in range(data_list_size):
+            """
+            seqname = data.loc[idx, 'sequence_name'].split(':')[0] # takes only the chromosome
                                                                  # name
             source='grafimo'
             tp='nucleotide_motif'
@@ -150,7 +155,39 @@ def writeGFF3(data):
         
             gffline='\t'.join([seqname, source, tp, start, end, str(score),
                                    strand, phase, atts])
-    
+            """
+
+            seqname = data_list[2][i]
+            chrom = seqname.split(':')[0]  # takes only the chromosome name
+            score = round(data_list[6][i], 1)
+            strand = data_list[5][i]
+
+            if strand == '-':
+                # keep forward strand coordinates
+                start = data_list[4][i]
+                end = data_list[3][i]
+            else:
+                start = data_list[3][i]
+                end = data_list[4][i]
+
+            motifID = data_list[0][i]
+            motifName = data_list[1][i]
+            pvalue = np.format_float_scientific(data_list[7][i], exp_digits=2)
+            qvalue = np.format_float_scientific(data_list[8][i], exp_digits=2)
+            sequence = data_list[9][i]
+            reference = data_list[10][i]
+            att1 = ''.join(['Name=', motifID, '_', seqname, strand, ':', reference])
+            att2 = ''.join(["Alias=", motifName])
+            att3 = ''.join(["ID=", motifID, '-', motifName, '-', seqname])
+            att4 = ''.join(['pvalue=', str(pvalue)])
+            att5 = ''.join(['qvalue=', str(qvalue)])
+            att6 = ''.join(['sequence=', sequence, ';\n'])
+            atts = ';'.join([att1, att2, att3, att4, att5, att6])
+
+            gffline = '\t'.join([chrom, SOURCE, TP, start, end, str(score),
+                                 strand, PHASE, atts])
+
+
             f.write(gffline)
             
     except:

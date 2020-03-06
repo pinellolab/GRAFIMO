@@ -14,6 +14,8 @@ pipeline
 import sys
 from shutil import which
 import numpy as np
+import pandas as pd
+from grafimo.GRAFIMOException import NoDataFrameException
 
 
 """
@@ -26,6 +28,9 @@ LOG_FACTOR=1.44269504
 RANGE=1000
 CHROMS_LIST=[str(i) for i in range(1, 23)] + ['X', 'Y']
 EXT_DEPS = ['tabix', 'vg', 'dot']
+SOURCE = 'grafimo'
+TP = 'nucleotide_motif'
+PHASE = '.'
 
 
 """
@@ -236,6 +241,58 @@ def unique_lst(lst, size = None):
     assert(len(unique_lst) > 0)
 
     return unique_lst
+
+
+def list_data(data):
+    """
+        Convert a pandas DataFrame in a list of lists, where
+        each column is a list of values
+        ----
+        Parameters:
+            data (pd.DataFrame) : input pandas DataFrame
+        ----
+        Returns:
+            summary (list) : pandas DataFrame converted in a
+                                list of lists
+    """
+
+    if not isinstance(data, pd.DataFrame):
+        raise NoDataFrameException("DataFrame given is not an instance of pandas.DataFrame")
+        die(1)
+
+    assert len(data.columns) == 11
+
+    seqnames = data['sequence_name'].to_list()
+    starts = data['start'].to_list()
+    stops = data['stop'].to_list()
+    scores = data['score'].to_list()
+    strands = data['strand'].to_list()
+    motifIDs = data['motif_id'].to_list()
+    motifNames = data['motif_alt_id'].to_list()
+    pvalues = data['p-value'].to_list()
+    sequences = data['matched_sequence'].to_list()
+    qvalues = data['q-value'].to_list()
+    references = data['reference'].to_list()
+
+    summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
+                    pvalues, qvalues, sequences, references]
+
+    summary_len = len(motifIDs)
+
+    assert summary_len == len(data.index)
+    assert summary_len == len(motifNames)
+    assert summary_len == len(seqnames)
+    assert summary_len == len(starts)
+    assert summary_len == len(stops)
+    assert summary_len == len(strands)
+    assert summary_len == len(scores)
+    assert summary_len == len(pvalues)
+    assert summary_len == len(qvalues)
+    assert summary_len == len(sequences)
+
+    return summary
+
+
 
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '=', printEnd = "\r"):
