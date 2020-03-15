@@ -93,7 +93,7 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
 
         else:
             objs_towrite=[df] # initialize the list of objects to save
-            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, vg_loc) # write results
+            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, vg_loc, qvalue) # write results
     
 
 # pipeline that performs the motif discovery on the given genome graph(s)
@@ -147,7 +147,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo,
 
         else:
             objs_towrite=[df] # initialize the list of objects to save
-            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, graph_genome)
+            ow.writeresults(objs_towrite, dest, m.getMotifID(), top_graphs, graph_genome, qvalue)
 
 
 def printWelcomeMsg(pipeline):
