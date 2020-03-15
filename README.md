@@ -104,11 +104,12 @@ Options                   | Parameter      | Description                  | Defa
 `-c`| `1 2 X ...` | List of chromosomes for which the variation graph will be created (or on which the motif will be searched)| Is created the variation graph for all the chromosomes (the motif is searched on all the chromosomes)
 `-k`| `BACKGROUND` | 	Path to the background file specifying the source of a 0-order background model to convert a probability matrix to a log-odds score matrix and to use in estimating the p-values of match scores. The background model normalizes for biased distribution of individual letters in the sequences. The guidelines to specify this file can be found at http://meme-suite.org/doc/bfile-format.html | Assume a uniform distribution for the background
 `-p`| `PSEUDOCOUNT` | Pseudocount that will be added to each count of the motif, to avoid problems in the computation of the log-odds score matrix, due to possible divisions by zero | Is used 0.1
-`-t` | `THRESHOLD` | Hits with a p-value higher than the defined threshold won't be returned in the results | A threshold of 1e-4 is used
+`-t` | `THRESHOLD` | Hits with a P-value (by default) or a q-value higher than the defined threshold won't be returned in the results | A threshold of 1e-4 is used
 `-q`|  | Specify if the q-value will not be computed for the scored sequences | The q-value is computed
 `-r`|  | Specify if only sequences from the forward strand have to be scanned | Sequences from both the forward and reverse strand are scanned 
 `-f`|  | Print results directly on the terminal without storing them | The results are stored in a directory and not printed on the terminal
 `-o`| `OUTDIR` | Specify the name of the directory where the results are stored | A directory named `grafimo_out_JOBID_MOTIFNAME` is created
+`--qvalueT` |  | If set to true, the threshold is applied on the q-values | The threshold is applied on the P-values
 `--top-graphs`| `GRAPHS_NUM` | Are created the PNG images of the first `GRAPHS_NUM` regions (in the results order)
 `--verbose`|  | Prints a lot of additional informations about the current run 
 
