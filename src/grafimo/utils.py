@@ -243,7 +243,7 @@ def unique_lst(lst, size = None):
     return unique_lst
 
 
-def list_data(data):
+def list_data(data, qvalue):
     """
         Convert a pandas DataFrame in a list of lists, where
         each column is a list of values
@@ -260,7 +260,8 @@ def list_data(data):
         raise NoDataFrameException("DataFrame given is not an instance of pandas.DataFrame")
         die(1)
 
-    assert len(data.columns) == 11
+    assert len(data.columns) <= 11
+    assert len(data.columns) >= 10
 
     seqnames = data['sequence_name'].to_list()
     starts = data['start'].to_list()
@@ -271,11 +272,17 @@ def list_data(data):
     motifNames = data['motif_alt_id'].to_list()
     pvalues = data['p-value'].to_list()
     sequences = data['matched_sequence'].to_list()
-    qvalues = data['q-value'].to_list()
     references = data['reference'].to_list()
 
-    summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-                    pvalues, qvalues, sequences, references]
+    if qvalue:
+        qvalues = data['q-value'].to_list()
+
+    if qvalue:
+        summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
+                    pvalues, sequences, references, qvalues]
+    else:
+        summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
+                   pvalues, sequences, references]
 
     summary_len = len(motifIDs)
 
@@ -287,12 +294,12 @@ def list_data(data):
     assert summary_len == len(strands)
     assert summary_len == len(scores)
     assert summary_len == len(pvalues)
-    assert summary_len == len(qvalues)
     assert summary_len == len(sequences)
 
+    if qvalue:
+        assert summary_len == len(qvalues)
+
     return summary
-
-
 
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '=', printEnd = "\r"):

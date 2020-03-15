@@ -18,7 +18,7 @@ import numpy as np
 from grafimo.GRAFIMOException import ValueException, SubprocessException, NoDataFrameException, FileReadingException
 from grafimo.utils import PHASE, TP, SOURCE, die, unique_lst, list_data
 
-def writeresults(objs, dest, motifID, top_graphs, genome_loc):
+def writeresults(objs, dest, motifID, top_graphs, genome_loc, qvalue):
     
     if not isinstance(objs, list):
         raise ValueException("The results to write must be in a list")
@@ -64,7 +64,7 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
             df.to_html('grafimo_out.html')
             
             # write the gff
-            writeGFF3(df)
+            writeGFF3(df, qvalue)
 
     # get the graphs of the top n regions 
     if top_graphs > 0:
@@ -100,7 +100,7 @@ def writeresults(objs, dest, motifID, top_graphs, genome_loc):
     os.chdir(cwd)
 
     
-def writeGFF3(data):
+def writeGFF3(data, qvalue):
     """
         Write a GFF file for the hits found by grafimo. 
         Are followed the conventions given at 
@@ -124,12 +124,13 @@ def writeGFF3(data):
         header = "##gff-version 3\n"
         f.write(header)
 
-        data_list = list_data(data)
+        data_list = list_data(data, qvalue)
+
+        if qvalue and len(data_list) < 11:
+            raise Exception("Some data were lost while transforming the result dataframe in a matrix")
+
         data_list_size = len(data_list[0])
 
-        #data_idxs = list(data.index)
-        
-        #for idx in data_idxs:
         for i in range(data_list_size):
 
             seqname = data_list[2][i]
@@ -148,16 +149,23 @@ def writeGFF3(data):
             motifID = data_list[0][i]
             motifName = data_list[1][i]
             pvalue = np.format_float_scientific(data_list[7][i], exp_digits=2)
-            qvalue = np.format_float_scientific(data_list[8][i], exp_digits=2)
-            sequence = data_list[9][i]
-            reference = data_list[10][i]
+            sequence = data_list[8][i]
+            reference = data_list[9][i]
+
+            if qvalue:
+                qvalue = np.format_float_scientific(data_list[10][i], exp_digits=2)
+
             att1 = ''.join(['Name=', motifID, '_', seqname, strand, ':', reference])
             att2 = ''.join(["Alias=", motifName])
             att3 = ''.join(["ID=", motifID, '-', motifName, '-', seqname])
             att4 = ''.join(['pvalue=', str(pvalue)])
-            att5 = ''.join(['qvalue=', str(qvalue)])
-            att6 = ''.join(['sequence=', sequence, ';\n'])
-            atts = ';'.join([att1, att2, att3, att4, att5, att6])
+            att5 = ''.join(['sequence=', sequence, ';\n'])
+
+            if qvalue:
+                attqv = ''.join(['qvalue=', str(qvalue)])
+                atts = ';'.join([att1, att2, att3, att4, attqv, att5])
+            else:
+                atts = ';'.join([att1, att2, att3, att4, att5])
 
             gffline = '\t'.join([chrom, SOURCE, TP, start, end, str(score),
                                  strand, PHASE, atts])
