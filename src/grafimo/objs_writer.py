@@ -131,31 +131,6 @@ def writeGFF3(data):
         
         #for idx in data_idxs:
         for i in range(data_list_size):
-            """
-            seqname = data.loc[idx, 'sequence_name'].split(':')[0] # takes only the chromosome
-                                                                 # name
-            source='grafimo'
-            tp='nucleotide_motif'
-            start=data.loc[idx, 'start']
-            end=data.loc[idx, 'stop']
-            score=round(data.loc[idx, 'score'], 1)
-            strand=data.loc[idx, 'strand']
-            phase='.'
-        
-            motifID=data.loc[idx, 'motif_id']
-            motifName=data.loc[idx, 'motif_alt_id']
-            pvalue=data.loc[idx, 'p-value']
-            sequence=data.loc[idx, 'matched_sequence']
-            att1=''.join(['Name=', motifID, '_', seqname, strand])
-            att2=''.join(["Alias=", motifName])
-            att3=''.join(["ID=", motifID, '-', motifName, '-', seqname])
-            att4=''.join(['pvalue=', str(pvalue)])
-            att5=''.join(['sequence=', sequence, ';\n'])
-            atts=';'.join([att1, att2, att3, att4, att5])
-        
-            gffline='\t'.join([seqname, source, tp, start, end, str(score),
-                                   strand, phase, atts])
-            """
 
             seqname = data_list[2][i]
             chrom = seqname.split(':')[0]  # takes only the chromosome name
@@ -189,6 +164,8 @@ def writeGFF3(data):
 
 
             f.write(gffline)
+
+        # end for
             
     except:
         raise FileReadingException("Unable to open or write data on grafimo_out.gff")
@@ -299,6 +276,32 @@ def getRegion_graph(region, genome_loc):
         if code != 0:
             raise SubprocessException("Error while executing " + cmd)
             die(1)
+
+    # end if else
+
+
+def print_results(results):
+    """
+        Print the DataFrame containing the results
+        directly to the terminal
+        ----
+        Parameters:
+            results (pd.DataFrame) : dataframe containing the analysis
+                                        results
+        ----
+        Returns:
+            None
+    """
+
+    if not isinstance(results, pd.DataFrame):
+        raise NoDataFrameException("The results must be stored in a pandas DataFrame")
+
+    # little hack in pd df parameters to avoid the weird default
+    # print of a DataFrame (cut the majority of lines)
+    pd.set_option("display.max_rows", len(results))
+    print() # newline
+    print(results)
+    pd.reset_option("display.max_rows")
 
 
 def printWriteResultsMsg(dest):

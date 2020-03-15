@@ -31,8 +31,8 @@ __version__ = '0.10'
 
 # pipeline that creates the graphs of the chromosomes beside the motif discovery
 def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile, 
-                         pseudo, pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, 
-                         pipeline, verbose = False):
+                         pseudo, threshold, no_reverse, qvalue, qvalueT, text_only,
+                         dest, top_graphs, pipeline, verbose = False):
     
     gplus = False # prevent unexpected behaviors
 
@@ -80,7 +80,7 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
 
         start_scan = time.time()
         
-        df = ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse, qvalue) # motif scanning
+        df = ps.scoreGraphsPaths(data, m, threshold, cores, no_reverse, qvalue, qvalueT) # motif scanning
 
         end_scan = time.time()
         if verbose:
@@ -89,7 +89,7 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
 
         if text_only:
             # print directly on the terminal the results in a TSV-like manner
-            print(df)
+            ow.print_results(df)
 
         else:
             objs_towrite=[df] # initialize the list of objects to save
@@ -98,8 +98,9 @@ def with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
 
 # pipeline that performs the motif discovery on the given genome graph(s)
 def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo, 
-                            pvalueT, no_reverse, qvalue, text_only, dest, top_graphs,
-                            pipeline, gplus=False, chroms=[], verbose = False):
+                            threshold, no_reverse, qvalue, qvalueT, text_only,
+                            dest, top_graphs,pipeline, gplus=False, chroms=[],
+                            verbose = False):
     
     printWelcomeMsg("WITHOUT_VG_CREATION")
     
@@ -133,7 +134,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo,
         
         start_scan = time.time()
 
-        df = ps.scoreGraphsPaths(data, m, pvalueT, cores, no_reverse, qvalue) # motif scanning
+        df = ps.scoreGraphsPaths(data, m, threshold, cores, no_reverse, qvalue, qvalueT) # motif scanning
         
         end_scan = time.time()
         if verbose:
@@ -142,7 +143,7 @@ def without_vg_pipeline(cores, graph_genome, bedfile, motifs, bgfile, pseudo,
 
         if text_only:
             # print directly on the terminal the results in a TSV-like manner
-            print(df)
+            ow.print_results(df)
 
         else:
             objs_towrite=[df] # initialize the list of objects to save

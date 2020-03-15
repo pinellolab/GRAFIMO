@@ -27,7 +27,7 @@ import subprocess
 from numba import jit
 from statsmodels.stats.multitest import multipletests
 
-def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
+def scoreGraphsPaths(subgraphs, motif, threshold, cores, no_reverse, qvalue, qvalueT):
     """
         Score the extracted sequences and save the results in a pandas 
         DataFrame. 
@@ -35,12 +35,15 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         Parameters:
             subgraphs (str) : path to the subgraphs sequences
             motif (Motif) :
-            pvalueT (float) : p-value threshold
+            threshold (float) : threshold to apply on the p-value (default) or on
+                                the q-value
             cores (int) : cores to use to run the function in parallel
             no_reverse (bool) : flag to consider only the sequences from the
                                 forward strand
             qvalue (bool) : flag to compute also the q-value for each hit
                             found
+            qvalueT (bool) : flag value, if set to True, the threshold will be
+                                applied on the q-values
         ----
         Returns:
             finaldf (pd.DataFrame) : dataframes with the results
@@ -63,7 +66,8 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
         raise ValueException("Do not know what to do with this 'qvalue' value")
         die(1)
         
-    assert pvalueT > 0
+    assert threshold > 0
+    assert threshold <= 1
     assert cores >= 0
 
     # the args are correct
@@ -123,6 +127,7 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
     starts = []
     ends = []
     pvalues = []
+    qvalues = []
     strands = []
     references = []
 
@@ -150,14 +155,13 @@ def scoreGraphsPaths(subgraphs, motif, pvalueT, cores, no_reverse, qvalue):
 
     # compute the q-values
     if qvalue:
-        qvalues = []
         qvalues = compute_qvalues(pvalues)
 
     print("\nScanned sequences:", seqsScanned)
     print("Scanned nucleotides:", nucsScanned)
             
     finaldf = buildDF(motif, seqnames, starts, ends, strands, scores,
-                        pvalues, qvalues, seqs, references, pvalueT)
+                        pvalues, qvalues, seqs, references, threshold, qvalueT)
             
     return finaldf
 
@@ -508,7 +512,8 @@ def compute_qvalues(pvalues):
 
         
 def buildDF(motif, seqnames, starts, ends, strands, 
-                scores, pvalues, qvalues, sequences, references, pvalueT):
+                scores, pvalues, qvalues, sequences,
+                references, threshold, qvalueT):
     """
         Build the dataframe summary of the retrieved data
         ----
@@ -526,7 +531,10 @@ def buildDF(motif, seqnames, starts, ends, strands,
                                 belongs to the reference genome or is obtained
                                 from the variants dfined in the VCF used to
                                 build the genome graph
-            pvalueT (float) : p-value threshold
+            threshold (float) : threshold to apply on the p-value (default) or on
+                                the q-values
+            qvalueT (bool) : if set to True, the threshold will be applied on the
+                                q-values
         ----
         Returns:
              df (pd.DataFrame)
@@ -584,6 +592,10 @@ def buildDF(motif, seqnames, starts, ends, strands,
         QVAL = True
         assert len(qvalues) == LSTLEN
 
+    if qvalueT:
+        assert len(qvalues) > 0 # if we apply the threshold on the q-values
+                                # we must have computed them
+
     seqnames_thresh = []
     starts_thresh = []
     ends_thresh = []
@@ -597,21 +609,38 @@ def buildDF(motif, seqnames, starts, ends, strands,
         qvalues_thresh = []
 
     for idx in range(LSTLEN):
-        pvalue = pvalues[idx]
 
-        if pvalue < pvalueT:
-            # only the sequences with a p-vaue under the threshold survive
-            seqnames_thresh.append(seqnames[idx])
-            starts_thresh.append(starts[idx])
-            ends_thresh.append(ends[idx])
-            strands_thresh.append(strands[idx])
-            scores_thresh.append(scores[idx])
-            pvalues_thresh.append(pvalues[idx])
-            sequences_thresh.append(sequences[idx])
-            references_thresh.append(references[idx])
+        if not qvalueT:
+            pvalue = pvalues[idx]
+            if pvalue < threshold:
+                # only the sequences with a p-value under the threshold survive
+                seqnames_thresh.append(seqnames[idx])
+                starts_thresh.append(starts[idx])
+                ends_thresh.append(ends[idx])
+                strands_thresh.append(strands[idx])
+                scores_thresh.append(scores[idx])
+                pvalues_thresh.append(pvalues[idx])
+                sequences_thresh.append(sequences[idx])
+                references_thresh.append(references[idx])
 
-            if QVAL:
-                qvalues_thresh.append(qvalues[idx])
+                if QVAL:
+                    qvalues_thresh.append(qvalues[idx])
+
+        else:
+            qvalue = qvalues[idx]
+            if qvalue < threshold:
+                # only the sequences with a q-value under the threshold survive
+                seqnames_thresh.append(seqnames[idx])
+                starts_thresh.append(starts[idx])
+                ends_thresh.append(ends[idx])
+                strands_thresh.append(strands[idx])
+                scores_thresh.append(scores[idx])
+                pvalues_thresh.append(pvalues[idx])
+                sequences_thresh.append(sequences[idx])
+                references_thresh.append(references[idx])
+                qvalues_thresh.append(qvalues[idx]) # the last control statement in this case is not
+                                                    # necessary (we must have the q-values)
+                                                    # otherwise we should not be here
 
     DFLEN = len(seqnames_thresh)
 

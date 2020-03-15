@@ -194,13 +194,14 @@ def get_AP():
     group.add_argument("-p", "--pseudo", type=float,
                        help='Pseudocount to add to the motif counts [optional]', nargs='?', const='0.1',
                        default='0.1', metavar='PSEUDOCOUNT')
-    group.add_argument("-t", "--pvalueT", type=float, nargs='?', default=1e-4,
+    group.add_argument("-t", "--threshold", type=float, nargs='?', default=1e-4,
                         metavar='THRESHOLD', const='1e-4',
-                        help='Defines a threshold on the p-value obtained form the scoring ' 
-                                'of each sequence.\n'
+                        help='Defines a threshold on the p-value (by default) obtained form the scoring ' 
+                                'of each sequence. It is possible to apply the threshold on the q-value '
+                                'using the -q (--qvalueT) option.\n'
                                 'Default is 1e-4 [optional]')
     group.add_argument("-q", "--no-qvalue", action='store_true', default=False, dest='no_qvalue',
-                        help='Flag parameter, if it is set to True will be computed the q-value for each hit')
+                        help='Flag parameter, if it is set to True the q-value for each hit will not be computed')
     group.add_argument("-r", "--no-reverse", default=False, action='store_true', dest='no_reverse',
                         help='Flag parameter, if it is set to True will be scored only '
                                 'sequences from the forward strand')
@@ -212,7 +213,9 @@ def get_AP():
     group.add_argument("-o", "--out", type=str,
                         help='Name of the directory where the results will be stored [optional]',
                         nargs='?', const='grafimo_out', default='grafimo_out', metavar='OUTDIR')
-
+    group.add_argument("--qvalueT", action='store_true', default=False, dest='qval_t',
+                       help='Flag parameter, if set to true the threshold will be applied on the '
+                            'q-value, rather than the p-value ')
     group.add_argument("--top-graphs", type=int,
                         help='Number of graphs of the regions that will be stored as PNG images in the results '
                         'directory [optional]',
@@ -419,11 +422,11 @@ def main(cmdLineargs = None):
     else:
         pseudocount = args.pseudo
         
-    if args.pvalueT <= 0 or args.pvalueT > 1:
+    if args.threshold <= 0 or args.threshold > 1:
         parser.error('The pvalue threshold must be between 0 and 1')
     
     else:
-        pvalueT = args.pvalueT
+        threshold = args.threshold
         
     if not isinstance(args.no_qvalue, bool) and args.no_qvalue != False \
         and args.no_qvalue != True:
@@ -450,6 +453,7 @@ def main(cmdLineargs = None):
         dest = args.out
 
     if dest == 'grafimo_out': # default option
+
         # to make unique the output directory we add the PID
         # to the name.
         #
@@ -457,7 +461,18 @@ def main(cmdLineargs = None):
         # same machine.
         #
         # believe me, this can happen
+
         dest = ''.join([dest, '_', str(os.getpid())])
+
+    if not isinstance(args.qval_t, bool) or(args.qval_t != False \
+        and args.qval_t != True):
+        parser.error("The --qvalueT parameter accepts only True or False as values")
+
+    elif args.no_qvalue == True and args.qval_t == True:
+        parser.error("Cannot apply the threshold on the q-values if you don't want them")
+
+    else:
+        qval_t = bool(args.qval_t)
 
     if args.top_graphs < 0:
         parser.error("The number of region graphs to show must be positive")
@@ -504,7 +519,7 @@ def main(cmdLineargs = None):
             print("\nEntering the pipeline with the variation graph creation\n")
 
         with_vg_pipeline(cores, linear_genome, vcf, chroms, bedfile, motifs, bgfile,
-                            pseudocount, pvalueT, no_reverse, qvalue, text_only, dest,
+                            pseudocount, threshold, no_reverse, qvalue, qval_t, text_only, dest,
                             top_graphs, True, verbose)
         
     elif isinstance(pipeline, onlyMotifScanningPipeline):
@@ -531,7 +546,7 @@ def main(cmdLineargs = None):
                 print("The graph " + xg + " will be queried\n")
         
             without_vg_pipeline(cores, xg, bedfile, motifs, bgfile, pseudocount, 
-                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, False)
+                                    threshold, no_reverse, qvalue, qval_t, text_only, dest, top_graphs, False)
             
         elif args.graph_genome_dir:
             
@@ -541,7 +556,8 @@ def main(cmdLineargs = None):
                 print("The graphs contained in directory " + graph_genome_dir + " will be queried\n")
             
             without_vg_pipeline(cores, graph_genome_dir, bedfile, motifs, bgfile, pseudocount,
-                                    pvalueT, no_reverse, qvalue, text_only, dest, top_graphs, False, gplus, chroms)
+                                    threshold, no_reverse, qvalue, qval_t, text_only, dest, top_graphs, False,
+                                    gplus, chroms)
             
     else:
         # error in the pipeline flag
