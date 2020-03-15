@@ -328,6 +328,14 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                     reference = sg_data.loc[i, 4]
 
                     seqsScanned += 1
+
+                    seqs.append(seq)
+                    seqnames.append(seqname)
+                    strands.append(strand)
+                    chroms.append(chrom)
+                    starts.append(start)
+                    ends.append(end)
+                    references.append(reference)
                         
             else:
                 # consider both strands
@@ -341,17 +349,17 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
                 reference = sg_data.loc[i, 4]
 
                 seqsScanned += 1
-               
-            seqs.append(seq)
-            seqnames.append(seqname)
-            strands.append(strand)
-            chroms.append(chrom)
-            starts.append(start)
-            ends.append(end)
-            references.append(reference)    
+
+                seqs.append(seq)
+                seqnames.append(seqname)
+                strands.append(strand)
+                chroms.append(chrom)
+                starts.append(start)
+                ends.append(end)
+                references.append(reference)
 
 
-    # build the dataframe for the results got from the current process 
+    # build the dataframe for the results got from the current process
     summary = pd.DataFrame()
     summary['sequence_name'] = seqnames
     summary['chromosome'] = chroms
@@ -371,7 +379,7 @@ def score_subgraphs(sgs, motif, no_reverse, psid, returnDict,
 
 # here is used numba to achieve performances near to the ones 
 # obtained with a C program
-@jit(nopython = True)
+@jit(nopython=True)
 def score_sequences(seqs, starts, no_reverse, scoreMatrix, 
                         pval_mat, minScore, scale, width, offset, seqs_num):
     """
