@@ -5,11 +5,10 @@
 @email: manu.tognon@gmail.com
 @email: manuel.tognon@studenti.univr.it
 
-Utilities used in the different steps of GRAFIMO
-pipeline
+Auxiliary functions used during the different steps of
+GRAFIMO workflow
 
 """
-
 
 import sys
 from shutil import which
@@ -17,25 +16,26 @@ import numpy as np
 import pandas as pd
 from grafimo.GRAFIMOException import NoDataFrameException
 
-
 """
     definition of constant variables
 """
 
-DNA_ALPHABET=['A', 'C', 'G', 'T'] # dna alphabet (we ignore the N and the IUPAC symbols)
-REV_COMPL={'A':'T', 'C':'G', 'G':'C', 'T':'A'}
-LOG_FACTOR=1.44269504
-RANGE=1000
-CHROMS_LIST=[str(i) for i in range(1, 23)] + ['X', 'Y']
+DNA_ALPHABET = ['A', 'C', 'G', 'T']  # dna alphabet (we ignore the N and the IUPAC symbols)
+REV_COMPL = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+PSEUDObg = np.double(0.0000005)
+LOG_FACTOR = 1.44269504
+RANGE = 1000
+CHROMS_LIST = [str(i) for i in range(1, 23)] + ['X', 'Y']
 EXT_DEPS = ['tabix', 'vg', 'dot']
 SOURCE = 'grafimo'
 TP = 'nucleotide_motif'
 PHASE = '.'
 
-
 """
     functions from utils.py
 """
+
+
 def die(code):
     """
         Exit from the execution
@@ -49,8 +49,18 @@ def die(code):
 
     sys.exit(code)
 
+# end of die()
 
-def isListEqual(lst1, lst2):
+
+def sigint_handler():
+
+    print("\nCaught SIGINT. GRAFIMO will exit")
+    die(2)
+# end of sigint_handler()
+
+
+def isListEqual(lst1,
+                lst2):
     """
         Compare two lists if they are equal
         ----
@@ -62,35 +72,37 @@ def isListEqual(lst1, lst2):
             (bool)
     """
 
-    if len(lst1)==len(lst2) and set(lst1)==set(lst2):
+    if len(lst1) == len(lst2) and set(lst1) == set(lst2):
         return True
 
     return False
 
+# end of isListEqual()
 
-def initialize_chroms_list(args_chroms, chroms_lst = CHROMS_LIST):
+
+def initialize_chroms_list(args_chroms):
     """
-        Initialize the list of chromosomes that will be 
+        Initialize the list of chromosomes that will be
         considered by GRAFIMO, during its run.
         ----
         Parameters:
-            args_chroms (list) : chromosome list as it is obtained 
+            args_chroms (list) : chromosome list as it is obtained
                                     from the user input
-            chroms_lst (list) : list of all the chromosome 
+            chroms_lst (list) : list of all the chromosome
         ----
         Returns:
 
     """
 
-    chroms = [] # result variable
-
     if not args_chroms:
-        chroms = chroms_lst
-    
+        chroms = CHROMS_LIST # all the chromosomes
+
     else:
-        chroms = args_chroms
+        chroms = args_chroms # the given chromosomes
 
     return chroms
+
+# end of initialize_chroms_list()
 
 
 def check_deps():
@@ -102,9 +114,9 @@ def check_deps():
             None
         ----
         Returns:
-            sat (bool) : set to False if at least one 
+            sat (bool) : set to False if at least one
                             dependency is not satisfied
-            deps_not_sats (list) : list containing the 
+            deps_not_sats (list) : list containing the
                                     dependencies that are
                                     not satisfied
     """
@@ -119,6 +131,7 @@ def check_deps():
 
     return sat, deps_not_sats
 
+# end of check_deps
 
 def isJaspar_ff(motif_file):
     """
@@ -166,7 +179,9 @@ def isMEME_ff(motif_file):
         return False  # the motif file was not given or the path is empty
 
 
-def almost_equal(value1, value2, slope):
+def almost_equal(value1,
+                 value2,
+                 slope):
     """
         Computes if two values are close considering a slope as degree
         of freedom
@@ -197,11 +212,10 @@ def lg2(value):
             (np.double)
     """
 
-    return (np.log(value)*LOG_FACTOR)
+    return (np.log(value) * LOG_FACTOR)
 
 
 def correct_path(path, path_id='', file_format=''):
-
     if path[-1:] == '/':
         new_path = ''.join([path, path_id, file_format])
     else:
@@ -210,7 +224,8 @@ def correct_path(path, path_id='', file_format=''):
     return new_path
 
 
-def unique_lst(lst, size = None):
+def unique_lst(lst,
+               size=None):
     """
         Get the unique values inside a list
         ----
@@ -224,7 +239,7 @@ def unique_lst(lst, size = None):
             unique_lst (list) : list of the unique values in lst
     """
 
-    assert(len(lst) > 0)
+    assert (len(lst) > 0)
 
     unique_lst = []
     el_num = 0
@@ -235,15 +250,16 @@ def unique_lst(lst, size = None):
             unique_lst.append(el)
             el_num += 1
 
-        if size != None and el_num == size: # size limit reached
+        if size != None and el_num == size:  # size limit reached
             break
 
-    assert(len(unique_lst) > 0)
+    assert (len(unique_lst) > 0)
 
     return unique_lst
 
 
-def list_data(data, qvalue):
+def list_data(data,
+              qvalue):
     """
         Convert a pandas DataFrame in a list of lists, where
         each column is a list of values
@@ -279,7 +295,7 @@ def list_data(data, qvalue):
 
     if qvalue:
         summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-                    pvalues, sequences, references, qvalues]
+                   pvalues, sequences, references, qvalues]
     else:
         summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
                    pvalues, sequences, references]
@@ -302,7 +318,14 @@ def list_data(data, qvalue):
     return summary
 
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '=', printEnd = "\r"):
+def printProgressBar(iteration,
+                     total,
+                     prefix='',
+                     suffix='',
+                     decimals=1,
+                     length=50,
+                     fill='=',
+                     printEnd="\r"):
     """
         Print the progress bar in the sequence scoring process and graph extraction
         process
@@ -316,7 +339,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
                                 representation of the percentage of work done
             length (int) : length of the bar
             fill (str) : character with will be filled the bar
-            printEnd (str) : what will be done when the bar has been 
+            printEnd (str) : what will be done when the bar has been
                                 completely printed
         ----
         Returns:
@@ -324,12 +347,12 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     """
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
-    bar = fill * filledLength + ' ' * (length - filledLength) # "allocate space" for the bar
-    
+    bar = fill * filledLength + ' ' * (length - filledLength)  # "allocate space" for the bar
+
     # print the bar
     print('\r%s [%s] %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
-    
+
     # new line when the bar is completely filled
     if iteration == total:
-        print()   
+        print()
 

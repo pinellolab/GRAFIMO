@@ -18,7 +18,7 @@ class GRAFIMOException(Exception):
     pass
 
 
-class DependencyException(GRAFIMOException):
+class DependencyError(GRAFIMOException):
     """
         raise an excepton if one of the external
         dependendencies needed by GRAFIMO is
@@ -106,14 +106,6 @@ class FileReadingException(Exception):
     pass
 
 
-class MissingFileException(GRAFIMOException):
-    """
-        Raise an exception when a file is missing
-    """
-
-    pass
-
-
 class ValueException(GRAFIMOException):
     """
         Raise an exception when a wrong value type is given to
@@ -140,7 +132,7 @@ class WrongPathException(GRAFIMOException):
     pass
 
 
-class SubprocessException(GRAFIMOException):
+class SubprocessError(GRAFIMOException):
     """
         Raise an exception if a subprocess call returns exit status
         different from 0
@@ -151,7 +143,7 @@ class SubprocessException(GRAFIMOException):
 
 class VGException(GRAFIMOException):
     """
-        Raise an exception for errors regarding vg tool
+        Raise an exception for errors during calls to VG
     """
 
     pass
