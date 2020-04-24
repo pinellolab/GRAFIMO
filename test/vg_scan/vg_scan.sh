@@ -49,7 +49,7 @@ grafimo findmotif -d ./ -b ENCFF633TEW_2000.bed -m MA0139.1.meme -k bg_nt
 # For example calling GRAFIMO on the same data used before, but using a threshold
 # value of 1e-3 on the q-values, constraining the scan to chromosome 20 and 21, and
 # using a pseudocount of 0.001:
-#   grafimo findmotif -d ./ -b ENCFF633TEW_2000.bed.gz -m MA0139.1.meme -k bg_nt -c 20 21 -p 0.001 -t 1e-3 --qvalueT
+#   grafimo findmotif -d ./ -b ENCFF633TEW_2000.bed -m MA0139.1.meme -k bg_nt -c 20 21 -p 0.001 -t 1e-3 --qvalueT
 #
 # The output of grafimo is a directory, named grafimo_out_JOBID_MOTIFID (default),
 # containing three files:
