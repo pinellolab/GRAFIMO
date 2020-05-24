@@ -114,6 +114,7 @@ Options                   | Parameter      | Description                  | Defa
 `--verbose`|  | Prints additional informations about GRAFIMO execution 
 
 **Output**
+
 GRAFIMO outputs the results of its analysis in three different file formats: TSV, HTML and GFF3. The three files are stored in the specified directory (`-o` option) or, by default, in a directory named `grafimo_out_JOBID_MOTIFNAME`.
 
 The three files will be named `grafimo_out.*`:
