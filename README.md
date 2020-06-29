@@ -94,7 +94,7 @@ To scan a pre-computed VG (set of VGs) type ```grafimo findmotif```, followed by
 
 Options                   | Parameter      | Description                  | Default behavior 
 --------------------------- | -------------- | ---------------------------- | ------------
-`-g` | `GRAPH-GENOME` | Path to a pre-computed genome variation graph. It must be in XG or VG format. The former is preferred over the latter (**NB** this argumennt is an alternative to the `-d` option) [mandatory] | No default 
+`-g` | `GRAPH-GENOME` | Path to a pre-computed genome variation graph. It must be in XG or VG format. The former is preferred over the latter (**NB** this argument is an alternative to the `-d` option) [mandatory] | No default 
 `-d` | `GRAPH-GENOME-DIR`| Path to the directory that contains a set of VGs, on which the motif will be searched. Is assumed that has been constructed a VG for each chromosome (**NB** this is an alternative to `-g`option) [mandatory] | No default
 `-b` | `BEDFILE` | Path to the BED file containing a set genomic coordinates where the motif will be searched [mandatory] | No default
 `-m` | `MOTIF` | Path to the motif file motif to search on VG(s). Both MEME and JASPAR formats are allowed [mandatory] | No default
