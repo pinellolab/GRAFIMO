@@ -11,7 +11,7 @@ from distutils.command.build_ext import build_ext as be
 import sys
 
 
-if sys.version_info[:2] < (3,6): # python 3.6 is required
+if sys.version_info[:2] < (3,6): # python 3.7 is required
     """
     Check Python version
     It must be >= 3.6
@@ -30,9 +30,9 @@ with open(readme, **encoding_arg) as infile:
 CYTHON_V_REQUIRED='0.28' # minimum Cython version required
 
 def check_cython():
-    
-       # Check Cython version
- 
+    """
+        Check Cython version
+    """
 
     try:
         from Cython import __version__ as cyv
