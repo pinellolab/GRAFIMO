@@ -1,38 +1,40 @@
-"""
+"""From this point will be chosen the path to follow by GRAFIMO.
 
-@author: Manuel Tognon
-
-@email: manu.tognon@gmail.com
-@email: manuel.tognon@studenti.univr.it
-
-
-Here are defined the steps of the two available pipelines:
-
-    - with vg creation
-    - only scoring (indexing of the vg if required [vg => xg])
-
-The final results can be visualized directly on the terminal if
-text_only == True (only in TSV format).
-By default the results are written to the repository given by the user.
+Here are called the functionalities to construct a genome variation 
+graph from a reference genome FASTA file and a phased VCF file or to 
+scan a precomputed graph for the occurrences of a given motif.
 
 """
 
 
 from grafimo.workflow import BuildVG, Findmotif
 from grafimo.constructVG import construct_vg, indexVG
-from grafimo.motif import get_motif_pwm
+from grafimo.motif_ops import get_motif_pwm
 from grafimo.motif_set import MotifSet
-from grafimo.extract_regions import get_regions
+from grafimo.extract_regions import scan_graph
 from grafimo.res_writer import print_results, write_results
 from grafimo.score_sequences import compute_results
-import time
 import pandas as pd
+import time
+import sys
+import os
+
 
 # version of GRAFIMO
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
-def buildvg(args_obj):
+def buildvg(args_obj: BuildVG) -> None:
+    """Call the functions needed to constuct the genome variation graph 
+    from a reference FASTA file and a phased VCF file.
+
+    Parameters
+    ----------
+    args_obj : BuildVG
+        container of the argumentgs needed to build a genome variation
+        graph
+
+    """
 
     if not isinstance(args_obj, BuildVG):
         raise ValueError("Unknown arguments object type")
@@ -51,6 +53,7 @@ def buildvg(args_obj):
         print("User parameters:")
         print("\t- Reference genome: ", args_obj.get_reference_genome())
         print("\t- VCF file: ", args_obj.get_vcf())
+        print("\t- Reindex: ", args_obj.get_reindex())
         print("\t- Chromosomes: ", args_obj.get_chroms())
         print("\t- Cores: ", args_obj.get_cores())
         print("\t- Output directory: ", args_obj.get_outdir())
@@ -67,17 +70,28 @@ def buildvg(args_obj):
 # end of buildvg()
 
 
-def findmotif(args_obj):
+def findmotif(args_obj: Findmotif) -> None:
+    """Call the functions needed to scan the genome variation graph for 
+    the occurrence of a DNA motif, in genomic regions defined in the given 
+    BED file.
+
+    Parameters
+    ----------
+    args_obj : Findmotif
+        container of the arguments needed to scan the genome variation
+        graph for the occurrences of the given DNA motif
+
+    """
 
     if not isinstance(args_obj, Findmotif):
         raise ValueError("Unknown arguments object type")
 
     printWelcomeMsg()
 
-    # if verbose == True will be printed a lot of unusefull stuff
-    verbose = args_obj.get_verbose()
+    # if verbose == True will be printed a lot of additional information
+    verbose: bool = args_obj.get_verbose()
 
-    cores = args_obj.get_cores()  # cores to use
+    cores: int = args_obj.get_cores()  # cores to use
 
     if verbose:
         print("User parameters:")
@@ -94,6 +108,7 @@ def findmotif(args_obj):
         print("\t- Threshold: ", args_obj.get_threshold())
         print("\t- Output directory: ", args_obj.get_outdir())
         print("\t- Cores: ", cores)
+        print("\t- recomb: ", args_obj.get_recomb())
         print("\t- Top graphs: ", args_obj.get_top_graphs())
         print("\t- no-qvalue: ", args_obj.get_no_qvalue())
         print("\t- no-reverse: ", args_obj.get_no_reverse())
@@ -104,17 +119,50 @@ def findmotif(args_obj):
         print()  # newline
     # end if
 
+    errmsg: str
+
     # if we have a whole genome graph, check that it is indexed (XG)
     # index it, otherwise
     if args_obj.has_graph_genome():
-        vg = args_obj.get_graph_genome()
+        vg: str = args_obj.get_graph_genome()
 
         if vg.split('.')[-1] == 'vg':
-            code = indexVG(vg)
+            warnmsg: str = "\nWARNING: the given VG has not been indexed. "
+            warnmsg += "To scan it, the VG must be indexed."
+            print(warnmsg)
+            answer = input("Do you want to index it now? (y/n) ")
 
-            if code != 0:
-                errmsg = ''.join(["\n\nERROR: unable to index ", vg, ". Exiting"])
-                raise(errmsg)
+            while answer.upper() != 'Y' and answer.upper() != 'N':
+                print(warnmsg)
+                answer: str = input("Do you want to index it now? (y/n) ")
+
+
+            if answer.upper() == 'Y':
+                vcf: str = input(
+                    "Enter the path to the VCF file to use to include haplotypes:\n"
+                    )
+                
+                if vcf.split(".")[-2] != "vcf" or vcf.split(".")[-1] != "gz":
+                    errmsg = "\n\nERROR: the given file is not a zipped VCF file (*.vcf.gz)"
+                    raise Exception(errmsg)
+                
+                if not os.path.isfile(vcf):
+                    errmsg = "\n\nERROR: unable to find the given VCF file"
+                    raise FileNotFoundError(errmsg)
+                
+                code: int = indexVG(vg, vcf, cores, verbose)
+
+                if code != 0:
+                    errmsg = ''.join(["\n\nERROR: unable to index ", vg, 
+                                      ". Exiting"])
+                    raise Exception(errmsg)
+    
+            else:
+                errmsg = "\n\nTo proceed you need to provide a XG and a GBWT "
+                errmsg += "index for your genome graph. GRAFIMO will exit"
+                print(errmsg)
+                sys.exit(1)
+            
             # end if
 
             vg = vg.split('.vg')[-2]
@@ -124,8 +172,8 @@ def findmotif(args_obj):
     # end if
 
     # process the motifs
-    motifs = args_obj.get_motif()
-    mtfSet = MotifSet()
+    motifs: list = args_obj.get_motif()
+    mtfSet: MotifSet = MotifSet()
 
     for mtf in motifs:
         if verbose:
@@ -133,7 +181,7 @@ def findmotif(args_obj):
 
         m = get_motif_pwm(mtf, args_obj, cores)
 
-        if not args_obj.get_test():
+        if args_obj.get_test():
             for i in range(len(m)):
                 print("Score matrix:")
                 m[i].print("score_matrix")
@@ -142,14 +190,14 @@ def findmotif(args_obj):
         mtfSet.addMotif(m)
     # end for
 
-    motif_num = mtfSet.length()
+    motif_num: int = mtfSet.length()
 
     for mtf in mtfSet:
         # extract sequences
-        sequence_loc = get_regions(mtf, args_obj)
+        sequence_loc: str = scan_graph(mtf, args_obj)
 
         # score sequences
-        res = compute_results(mtf, sequence_loc, args_obj)
+        res: pd.DataFrame = compute_results(mtf, sequence_loc, args_obj)
 
         # write results
         if args_obj.get_text_only():
@@ -162,15 +210,9 @@ def findmotif(args_obj):
 # end of findmotif()
 
 
-def printWelcomeMsg():
-    """
-        Prints the intro message for GRAFIMO
-        ----
-        Params:
-            None
-        ----
-        Returns:
-            None
+def printWelcomeMsg() -> None:
+    """Prints the welcome message for GRAFIMO
+  
     """
     for _ in range(50):
         print('*', end='')

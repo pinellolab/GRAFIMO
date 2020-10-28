@@ -1,26 +1,28 @@
-"""
+"""Functions to score the motif occurrence candidates found scanning
+the genome variation graph in the given genomic regions.
 
-@author: Manuel Tognon
+To score the motif occurrences is used the scaled scoring matrix 
+previously computed from motif PWM data. The resulting scaled scores are
+then converted in the corresponding log-odds values. To each score
+is given a P-value and if requested a q-value.
 
-@email: manu.tognon@gmail.com
-@email: manuel.tognon@studenti.univr.it
-
-Scoring of the retrieved sequences.
-
-Each sequence o length L, where L is the length of the motif,
-retrieved from the regions defined in the BED file, is scored
-using the scoring matrix built from the input motif file.
+The occurrences retrieved in the results are only those surviving the 
+threshold put by the user on the P-value or on the q-value (1e-4 by
+default on both)
 
 The running time of the algorithm used is bounded by O(n^2).
-
 """
 
 
 from grafimo.motif import Motif
 from grafimo.workflow import Findmotif
-from grafimo.GRAFIMOException import WrongPathException, ValueException, SubprocessError
+from grafimo.resultsTmp import ResultTmp
+from grafimo.GRAFIMOException import WrongPathException, ValueException, \
+    SubprocessError
 from grafimo.utils import die, printProgressBar, sigint_handler
+from typing import List, Optional, Dict, Tuple
 from statsmodels.stats.multitest import multipletests
+from multiprocessing.managers import DictProxy, SyncManager
 from numba import jit
 import multiprocessing as mp
 import pandas as pd
@@ -33,191 +35,78 @@ import sys
 import os
 
 
-class ResultTmp(object):
+
+def compute_results(motif: Motif,
+                    sequence_loc: str,
+                    args_obj: Optional[Findmotif] = None,
+                    testmode: Optional[bool] = False
+) -> pd.DataFrame:
+    """Score all the sequences extracted from the genome variation graph
+    in the regions defined in the input BED file.
+
+    To score the sequences is used the scaled motif scoring matrix, 
+    stored in the input Motif instance.
+
+    To each score is assigned a P-value using the P-value matrix, 
+    contained in the Motif instance.
+    
+    Parameters
+    ----------
+    motif : Motif
+        motif data to score sequences
+    sequence_loc : str
+        path to the intermediate files containing the sequences 
+        extracted from the genome variation graph
+    args_obj : Findmotif, optional
+        container for the arguments needed during the scoring step
+    testmode : bool, optional
+        flag value manually set used for test purposes
+
+    Returns
+    -------
+    pandas.DataFrame
+        scoring results
     """
-        Class to store intermediate results of the
-        sequence scoring step
-    """
 
-    _seqnames = None
-    _seqs = None
-    _chroms = None
-    _starts = None
-    _stops = None
-    _strands = None
-    _scores = None
-    _pvalues = None
-    _references = None
-
-    def __init__(self,
-                 seqnames,
-                 seqs,
-                 chroms,
-                 starts,
-                 stops,
-                 strands,
-                 scores,
-                 pvalues,
-                 references):
-
-        assert len(seqnames) == len(seqs)
-        assert len(seqnames) == len(chroms)
-        assert len(seqnames) == len(starts)
-        assert len(seqnames) == len(stops)
-        assert len(seqnames) == len(strands)
-        assert len(seqnames) == len(scores)
-        assert len(seqnames) == len(pvalues)
-        assert len(seqnames) == len(references)
-
-        if not isinstance(seqnames, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(seqs, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(chroms, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(starts, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(stops, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(strands, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(scores, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(pvalues, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        if not isinstance(references, list):
-            errmsg = "\n\nERROR: unable to store temporary results. Wrong data-type given"
-            raise ValueError(errmsg)
-
-        self._seqnames = seqnames
-        self._seqs = seqs
-        self._chroms = chroms
-        self._starts = starts
-        self._stops = stops
-        self._strands = strands
-        self._scores = scores
-        self._pvalues = pvalues
-        self._references = references
-
-    def get_seqnames(self):
-        if not self._seqnames:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._seqnames
-
-    def get_seqs(self):
-        if not self._seqs:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._seqs
-
-    def get_chroms(self):
-        if not self._chroms:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._chroms
-
-    def get_starts(self):
-        if not self._starts:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._starts
-
-    def get_stops(self):
-        if not self._stops:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._stops
-
-    def get_strands(self):
-        if not self._strands:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._strands
-
-    def get_scores(self):
-        if not self._scores:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._scores
-
-    def get_pvalues(self):
-        if not self._pvalues:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._pvalues
-
-    def get_references(self):
-        if not self._references:
-            errmsg = "\n\nERROR: attempting to access an empty attribute"
-            raise ValueException(errmsg)
-
-        return self._references
-
-# end of ResultTmp
-
-
-def compute_results(motif,
-                    sequence_loc,
-                    args_obj):
-    """
-        Score all the sequences extracted from regions defined in the
-        input BED file.
-        To score sequences is used the processed input motif.
-        The results are then stored in a pandas DataFrame
-        ----
-        Parameters:
-            motif (Motif) : processed motif, used to score sequences
-            sequence_loc (str) : path to temporary files storing sequences extracted
-                                    during the previous step
-            args_obj (Findmotif) : arguments used during the sequnece scoring step
-        ----
-        Returns:
-            finaldf (pd.DataFrame) : pandas DataFrame containing the results of
-                                        the GRAFIMO analysis
-    """
+    cores:int
+    threshold: float
+    no_qvalue: bool
+    qval_t: bool
+    no_reverse: bool
+    recomb: bool
+    verbose: bool
+    errmsg: str
 
     if not isinstance(sequence_loc, str):
-        errmsg = ''.join("\n\nERROR: unable to locate extracted sequences in ", sequence_loc, ". Exiting")
+        errmsg = ''.join(["\n\nERROR: unable to locate extracted sequences in ", 
+                          sequence_loc])
         raise FileNotFoundError(errmsg)
 
     if not isinstance(motif, Motif):
-        raise ValueError("\n\nERROR: the given motif is not an instance of Motif")
+        errmsg = "\n\nERROR: the given motif is not an instance of Motif"
+        raise ValueError(errmsg)
 
-    if not isinstance(args_obj, Findmotif):
-        raise ValueError("\n\nERROR: unrecognized argument object type")
+    if not testmode:
+        if not isinstance(args_obj, Findmotif):
+            errmsg = "\n\nERROR: unrecognized argument object type"
+            raise ValueError(errmsg)
 
-    # reading arguments
-    cores = args_obj.get_cores()
-    threshold = args_obj.get_threshold()
-    no_qvalue = args_obj.get_no_qvalue()
-    qval_t = args_obj.get_qvalueT()
-    no_reverse = args_obj.get_no_reverse()
-    verbose = args_obj.get_verbose()
+    if not testmode:
+        cores = args_obj.get_cores()
+        threshold = args_obj.get_threshold()
+        no_qvalue = args_obj.get_no_qvalue()
+        qval_t = args_obj.get_qvalueT()
+        no_reverse = args_obj.get_no_reverse()
+        recomb = args_obj.get_recomb()
+        verbose = args_obj.get_verbose()
+    else:
+        cores = 1
+        threshold = 1
+        recomb = True
+        no_qvalue = False
+        qval_t = False
+        no_reverse = False
+        verbose = False
 
     assert threshold > 0
     assert threshold <= 1
@@ -225,35 +114,48 @@ def compute_results(motif,
 
     print_scoring_msg(no_reverse, motif)
 
-    cwd = os.getcwd()
-    os.chdir(sequence_loc)  # go to sequence location
+    cwd: str = os.getcwd()
+    os.chdir(sequence_loc)
 
-    manager = mp.Manager()
-    return_dict = manager.dict()  # results
-    scanned_nucs_dict = manager.dict()  # nucleotides scanned
-    scanned_seqs_dict = manager.dict()  # sequences scanned
+    manager: SyncManager = mp.Manager()
+    # results
+    return_dict: DictProxy = manager.dict()
+    # scanned nucleotides
+    scanned_nucs_dict: DictProxy = manager.dict()
+    # scanned sequences  
+    scanned_seqs_dict: DictProxy = manager.dict()  
 
-    sequences = glob.glob('*.tsv')  # get all tmp files containing sequences
-    sequences_split = np.array_split(sequences, cores)  # split the sequence set in #cores chunks
+    # get all tmp files containing sequences
+    sequences: List[str] = glob.glob('*.tsv')  
+    if len(sequences) < cores:
+        cores = len(sequences)
+    # split the sequence set in no. cores chunks
+    sequences_split: List[str] = np.array_split(sequences, cores)  
 
-    jobs = []  # jobs list
-    proc_finished = 0  # number of jobs done
+    jobs = list()  # jobs list
+    proc_finished: int = 0 
 
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    signal.signal(signal.SIGINT, original_sigint_handler)  # overwrite the default SIGINT handler to exit gracefully
+    # overwrite the default SIGINT handler to exit gracefully
     # https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python
+    signal.signal(signal.SIGINT, original_sigint_handler)  
+    
 
     if verbose:
-        start_s = time.time()
+        start_s: float = time.time()
 
     try:
 
         # compute results in parallel
         for i in range(cores):
-            p = mp.Process(target=score_seqs, args=(sequences_split[i], motif, no_reverse, return_dict,
-                                                         scanned_seqs_dict, scanned_nucs_dict, i))
+            p = mp.Process(
+                target=score_seqs, args=(
+                    sequences_split[i], motif, no_reverse, return_dict, 
+                    scanned_seqs_dict, scanned_nucs_dict, i
+                    )
+                )
             jobs.append(p)
-            p.start()  # start the process
+            p.start()  
         # end for
 
         # to print 0%, otherwise start from  % as first chunk id already completed completed
@@ -265,48 +167,52 @@ def compute_results(motif,
             printProgressBar(proc_finished, cores, prefix='Progress:',
                              suffix='Complete', length=50)
         # end for
+    
     except KeyboardInterrupt:
         sigint_handler()
         sys.exit(2)
 
     else:
-
         if verbose:
-            end_s = time.time()
-            msg = ''.join(["\nScored all sequences in ", str(end_s - start_s), "s"])
-            print(msg)
+            end_s: float = time.time()
+            print(
+                "Scored all sequences in %.2fs" % (end_s - start_s)
+            )
 
         else:
             pass # all was OK, go to the next instruction
-        # end if
+    
     # end try
 
-    os.chdir(cwd)  # get back to starting point
+    os.chdir(cwd) 
 
-    cmd = "rm -rf {0}".format(sequence_loc)  # remove temporary sequence files
-    code = subprocess.call(cmd, shell=True)
+    if not testmode:
+        cmd: str = "rm -rf {0}".format(sequence_loc)
+        code: int = subprocess.call(cmd, shell=True)
 
-    if code != 0:
-        msg = ' '.join(["\n\nERROR: an error occurred while running", cmd])
-        raise SubprocessError(msg)
-    # end if
+        if code != 0:
+            errmsg = "\n\nERROR: an error occurred while running %s" % cmd
+            raise SubprocessError(errmsg)
+    
 
     if verbose:
-        start_df = time.time()
+        start_df: str = time.time()
 
-    # recover all analysis results and summarize them in a single data-structure
-    seqnames = []
-    seqs = []
-    chroms = []
-    starts = []
-    stops = []
-    strands = []
-    scores = []
-    pvalues = []
-    references = []
+    # recover all analysis results and summarize them in a single 
+    # data structure
+    seqnames: List[str] = list()
+    seqs: List[str] = list()
+    chroms: List[str] = list()
+    starts: List[int] = list()
+    stops: List[int] = list()
+    strands: List[str] = list()
+    scores: List[np.double] = list()
+    pvalues: List[np.double] = list()
+    frequencies: List[int] = list()
+    references: List[str] = list()
 
-    seqs_scanned = 0
-    nucs_scanned = 0
+    seqs_scanned: int = 0
+    nucs_scanned: int = 0
 
     for key in return_dict.keys():
 
@@ -320,6 +226,7 @@ def compute_results(motif,
         strands += return_dict[key].get_strands()
         scores += return_dict[key].get_scores()
         pvalues += return_dict[key].get_pvalues()
+        frequencies += return_dict[key].get_frequencies()
         references += return_dict[key].get_references()
 
         # compute the total number of scanned sequences and nucleotides
@@ -327,9 +234,10 @@ def compute_results(motif,
         nucs_scanned += scanned_nucs_dict[key]  # the keys are the same as return_dict
     # end for
 
+    qvalues: List[np.double]
     # compute the q-values
     if no_qvalue:
-        qvalues = []  # empty list -> not computed
+        qvalues = list()  # empty list -> not computed
     else:
         qvalues = compute_qvalues(pvalues)
     # end if
@@ -338,74 +246,83 @@ def compute_results(motif,
     print("Scanned nucleotides:", nucs_scanned)
 
     # summarize results in a pandas DF
-    finaldf = build_df(motif, seqnames, starts, stops, strands, scores,
-                       pvalues, qvalues, seqs, references, threshold,
-                       qval_t, no_qvalue)
+    finaldf: pd.DataFrame = build_df(motif, seqnames, starts, stops, strands, 
+                                     scores, pvalues, qvalues, seqs, frequencies, 
+                                     references, threshold, qval_t, no_qvalue, 
+                                     recomb)
 
     if verbose:
-        end_df = time.time()
-        msg = ''.join(["\nBuilt result summary in ", str(end_df - start_df), "s"])
-
+        end_df: float = time.time()
+        print("\nResults summary built in %.2fs" % (end_df - start_df))
+    
     return finaldf
 
 # end of compute_results()
 
 
-def score_seqs(sequences,
-               motif,
-               no_reverse,
-               return_dict,
-               scanned_seqs_dict,
-               scanned_nucs_dict,
-               pid):
-    """
-        Retrieve the extracted sequences and score them,
-        using a given motif
-        ----
-        Parameters:
-            sequences (str) : sequences to score
-            motif (Motif) : processed motif used to score sequences
-            no_reverse (bool) : if set to True, only sequences belonging
-                                to fw strand will be scored, belonging to
-                                both fw and rev strand, otherwise
-            return_dict (dict) : shared variable used to store partial results
-            scanned_seqs_dict (dict) : shared variable to store the number of
-                                        scanned sequences
-            scanned_nucs_dict (dict) :  shared variable to store the number of
-                                        scanned nucleotides
-            pid (int) : current process ID
-        ----
-        Returns:
-            None
+def score_seqs(sequences: List[str],
+               motif: Motif,
+               no_reverse: bool,
+               return_dict: DictProxy,
+               scanned_seqs_dict: DictProxy,
+               scanned_nucs_dict: DictProxy,
+               pid: int
+) -> None:
+    """Score the retrieved sequences using motif scoring matrix data.
+
+    The partial results are stored in a dictionary with current
+    process ID as key for the current entry.
+
+    The different entries will be merged at the end, to obtian the 
+    final results report.
+
+    Parameters
+    ----------
+    sequences : list
+        sequences to score
+    motif : Motif
+        motif object containing thescoring matrix and the P-value matrix
+    no_reverse:
+        if True only the sequences belonging to the forward strand will
+        be scored
+    return_dict : multiprocessing.managers.DictProxy
+        dictionary where the current chunk of results will be
+        stored
+    scanned_seqs_dict : mp.managers.DictProxy
+        dictionary storing the number of sequences scanned in each 
+        sequence chunk
+    scanned_nucs_dict : mp.managers.DictProxy
+        dictionary storing the number of nucleotides scanned in each
+        sequence chunk
     """
 
     try:
         # get Motif attributes to score sequences
-        score_matrix = motif.getMotif_scoreMatrix()
-        pval_mat = motif.getMotif_pval_mat()
-        min_score = motif.getMin_val()
-        scale = motif.getScale()
-        width = motif.getWidth()
-        offset = motif.getOffset()
+        score_matrix: np.ndarray = motif.getMotif_scoreMatrix()
+        pval_mat: np.array = motif.getMotif_pval_mat()
+        min_score: int = motif.getMin_val()
+        scale: int = motif.getScale()
+        width: int = motif.getWidth()
+        offset: np.double = motif.getOffset()
 
         # initialize lists where results will be stored
-        seqs = []
-        scores = []
-        pvalues = []
-        seqnames = []
-        chroms = []
-        starts = []
-        stops = []
-        strands = []
-        references = []
+        seqs: List[str] = list()
+        scores: List[np.double] = list()
+        pvalues: List[np.duble] = list()
+        seqnames: List[str] = list()
+        chroms: List[str] = list()
+        starts: List[int] = list()
+        stops: List[int] = list()
+        strands: List[str] = list()
+        frequencies: List[int] = list()
+        references: List[str] = list()
 
-        seqs_scanned = 0  # counter of the scanned sequences number
+        seqs_scanned: int = 0  # counter for scanned sequences 
 
-        # read the sequences
         for s in sequences:
-            with open(s, mode='r') as raw_sequences:  # read sequence files in read only mode
+            with open(s, mode='r') as raw_sequences:
                 for line in raw_sequences:
-                    data = line.split('\t')  # are TSV files
+                    data = line.split('\t')  
 
                     strand = data[2][-1]
 
@@ -415,43 +332,56 @@ def score_seqs(sequences,
 
                             # read the final values
                             seq = data[1]
-                            seqname = data[0]
+                            seqname = ''.join(['chr', data[0]])
                             chrom = seqname.split(':')[0]
                             start = data[2].split(':')[1]
                             start = start[:-1]
                             stop = data[3].split(':')[1]
                             stop = stop[:-1]
-                            ref = data[4]
-                            score, pvalue = compute_score_seq(seq, score_matrix, pval_mat,
-                                                              min_score, scale, width, offset)
+                            freq = data[4]
+                            ref = data[5]
+                            score, pvalue = compute_score_seq(seq, score_matrix, 
+                                                              pval_mat, min_score, 
+                                                              scale, width, offset)
                             seqs_scanned += 1
+                            seqs.append(seq)
+                            scores.append(score)
+                            pvalues.append(pvalue)
+                            seqnames.append(seqname)
+                            chroms.append(chrom)
+                            starts.append(start)
+                            stops.append(stop)
+                            strands.append(strand)
+                            frequencies.append(freq)
+                            references.append(ref)
                         # end if
 
                     else:  # score both fw and reverse strands
 
                         seq = data[1]
-                        seqname = data[0]
+                        seqname = ''.join(['chr', data[0]])
                         chrom = seqname.split(':')[0]
                         start = data[2].split(':')[1]
                         start = start[:-1]
                         stop = data[3].split(':')[1]
                         stop = stop[:-1]
-                        ref = data[4]
-                        score, pvalue = compute_score_seq(seq, score_matrix, pval_mat,
-                                                          min_score, scale, width, offset)
+                        freq = data[4]
+                        ref = data[5]
+                        score, pvalue = compute_score_seq(seq, score_matrix, 
+                                                          pval_mat, min_score, 
+                                                          scale, width, offset)
                         seqs_scanned += 1
+                        seqs.append(seq)
+                        scores.append(score)
+                        pvalues.append(pvalue)
+                        seqnames.append(seqname)
+                        chroms.append(chrom)
+                        starts.append(start)
+                        stops.append(stop)
+                        strands.append(strand)
+                        frequencies.append(freq)
+                        references.append(ref)
                     # end if
-
-                    # add data to final summary
-                    seqs.append(seq)
-                    scores.append(score)
-                    pvalues.append(pvalue)
-                    seqnames.append(seqname)
-                    chroms.append(chrom)
-                    starts.append(start)
-                    stops.append(stop)
-                    strands.append(strand)
-                    references.append(ref)
                 # end for
             # end open
         # end for
@@ -461,53 +391,62 @@ def score_seqs(sequences,
 
     else:
 
-        res_tmp = ResultTmp(seqnames, seqs, chroms, starts,
-                            stops, strands, scores, pvalues, references)
+        res_tmp = ResultTmp(seqnames, seqs, chroms, starts, stops, strands, 
+                            scores, pvalues, frequencies, references)
 
         return_dict[pid] = res_tmp
         scanned_seqs_dict[pid] = seqs_scanned
-        scanned_nucs_dict[pid] = seqs_scanned * width  # width nucleotides per sequence
-
+        scanned_nucs_dict[pid] = seqs_scanned * width 
     # end try
 
 # end of score_seqs()
 
 
-# using numba are achieved better perfomances
 @jit(nopython=True)
-def compute_score_seq(seq,
-                      score_matrix,
-                      pval_mat,
-                      min_score,
-                      scale,
-                      width,
-                      offset):
-    """
-        Score a sequence using a processed motif scoring matrix
-        ----
-        Parameters:
-            seq (str) : sequence to score
-            score_matrix (np.ndarray) : scoring matrix
-            pval_mat (np.ndarray) : matrix used to compute P-values
-                                    using a DP-algorithm (Staden, 1994)
-            min_score (int) : lowest score in the scoring matrix
-            scale (int) : scale used during motif processing
-            width (int) : motif width
-            offset (int) : offset used during motif processing
-        ----
-        Returns:
-            score (np.double) : sequence score
-            pvalue (np.double) : sequence score P-value
+def compute_score_seq(seq: str,
+                      score_matrix: np.ndarray,
+                      pval_mat: np.array,
+                      min_score: int,
+                      scale: int,
+                      width: int,
+                      offset: np.double
+) -> Tuple[np.double, np.double]:
+    """Assign to a DNA sequence a log-odds score based on motif scoring
+    matrix. To each score is assigned a corresponding P-value.
+
+    Parameters
+    ----------
+    seq : str
+        sequence
+    score_matrix : numpy.ndarray 
+        motif scaled scoring matrix
+    pval_mat : numpy.array
+        motif P-value matrix
+    min_score : int
+        minimum score within the scoring matrix
+    scale : int
+        scaling factor
+    width : int
+        motif width
+    offset : numpy.double
+        scaling offset
+
+    Returns
+    -------
+    numpy.double
+        sequence log-odds score
+    numpy.double
+        sequence P-value
     """
 
-    score = 0
+    score: int = 0
 
-    seq_len = len(seq)
+    seq_len: int = len(seq)
     assert seq_len == width
 
     # score the current sequence
     for i in range(width):
-        nuc = seq[i]
+        nuc: str = seq[i]
 
         if nuc == 'N':
             score = min_score
@@ -528,132 +467,155 @@ def compute_score_seq(seq,
 
     # get the p-value for the obtained score
     tot = pval_mat.sum()
-    pvalue = (pval_mat[score:].sum()) / tot
+    pvalue: np.double = (pval_mat[score:].sum()) / tot
 
     # retrieve the log-likelihood score
-    logodds = (score / scale) + (width * offset)
+    logodds: np.double = (score / scale) + (width * offset)
     score = logodds
 
-    assert pvalue > 0
-    assert pvalue <= 1
+    assert (pvalue > 0 and pvalue <= 1)
 
     return score, pvalue
 
 # end of compute_score_seq()
 
 
-def compute_qvalues(pvalues):
-    """
-        Compute the q-values for a given list
-        of P-values, using the Benjamini-Hochberg method
-        ----
-        Parameters:
-            pvalues (list) : list of P-values
-        ----
-        Returns:
-            qvalues (list) : list of computed q-values
+def compute_qvalues(pvalues: List[np.double]) -> List[np.double]:
+    """Compute q-values for a given list of P-values.
+
+    The q-values are obtained using the Benjamini-Hochberg method.
+
+    Parameters
+    ----------
+    pvalues : list
+        list of P-values
+
+    Returns
+    -------
+    list
+        list of q-values
     """
 
     if not isinstance(pvalues, list):
-        errmsg = "\n\nERROR: P-values must be in a list"
+        errmsg: str = "\n\nERROR: P-values must be in a list"
         raise ValueException(errmsg)
 
     print("\nComputing q-values...\n")
 
     # use Benjamini-Hochberg procedure to correct P-values
+    mt_obj: Tuple[np.ndarray, np.ndarray, np.double, float]
     mt_obj = multipletests(pvalues, method="fdr_bh")
-    qvalues = list(mt_obj[1])
+    qvalues: List[float] = list(mt_obj[1])
 
     return qvalues
 
 # end of compute_qvalues()
 
 
-def build_df(motif,
-             seqnames,
-             starts,
-             stops,
-             strands,
-             scores,
-             pvalues,
-             qvalues,
-             sequences,
-             references,
-             threshold,
-             qval_t,
-             no_qvalue):
-    """
-        Build a pandas DataFrame to summarize the results
-        of GRAFIMO analysis
-        ----
-        Parameters:
-            motif (Motif) : motif
-            seqnames (list) : list of sequence names
-            starts (list) : list of sequence starting positions
-            stops (list) : list of sequence ending positions
-            strands (list) : list of sequence strands
-            scores (list) : list of sequence scores
-            pvalues (list) : list of sequence score P-values
-            qvalues (list) : list of sequence q-values
-            sequences (list) : list of sequences
-            references (list) : list of sequence flag values. If 'ref',
-                                then the sequence belong to the reference genome,
-                                if 'non.ref', then the sequence contains variants
-            threshold (float) : threshold to apply on the P-value (default behavior)
-                                or on the q-values
-            qval_t (bool) : if set to True, the threshold will be applied on the
-                            q-values, on the P-values otherwise
-        ----
-        Returns:
-             df (pd.DataFrame)
+def build_df(motif: Motif,
+             seqnames: List[str],
+             starts: List[int],
+             stops: List[int],
+             strands: List[str],
+             scores: List[np.double],
+             pvalues: List[np.double],
+             qvalues: List[np.double],
+             sequences: List[str],
+             frequencies: List[int],
+             references: List[str],
+             threshold: float,
+             qval_t: bool,
+             no_qvalue: bool, 
+             recomb: bool
+) -> pd.DataFrame:
+    """Build the results summary report. The results are stored in a 
+    pandas DataFrame object.
+
+    The motif occurrence candidates are filtered applying a threshold on
+    the P-value or on the q-value.
+
+    The remaining entries are reported in the final results.
+
+    Parameters
+    ----------
+    motif : Motif
+        Motif object
+    seqnames : list
+        sequence names
+    starts : list
+        starting coordinates
+    stops : list
+        stopping coordinates
+    strands : list
+        DNA strands
+    pvalues: list
+        P-values
+    qvalues : list
+        q-values
+    sequences : list
+        sequences
+    references : list
+        flag values stating if the sequences contain genomi variants
+    threshold : float
+        threshold to apply on P-values or q-values in order to filter
+        the motif occurrence candidates to report
+    qval_t : bool
+        if True the threshold will be applied on q-values rather on
+        P-values
+    no_qvalue:
+        if True the q-values have not been computed
+    recomb : bool
+        if True will be reported also sequences which can be built with 
+        the given set of genomic variants but do not appear in the
+        available samples haplotypes
+    
+    Returns
+    -------
+    pandas.DataFrame
+        final results report
     """
 
+    errmsg: str = "\n\nERROR: unknown data-type for motif"
     if not isinstance(motif, Motif):
-        errmsg = "\n\nERROR: unknown data-type for motif"
         raise ValueException(errmsg)
 
     if not isinstance(seqnames, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(starts, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(stops, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(strands, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(pvalues, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(qvalues, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(sequences, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(references, list):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
+        raise ValueException(errmsg)
+
+    if not isinstance(references, list):
         raise ValueException(errmsg)
 
     if not isinstance(qval_t, bool):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
     if not isinstance(no_qvalue, bool):
-        errmsg = "\n\nERROR: unknown data-type, cannot proceed"
         raise ValueException(errmsg)
 
-    # all lists must have the same length
-    lst_len = len(seqnames)
+    if not isinstance(recomb, bool):
+        raise ValueException(errmsg)
+
+    lst_len: int = len(seqnames)
 
     assert len(starts) == lst_len
     assert len(stops) == lst_len
@@ -661,35 +623,42 @@ def build_df(motif,
     assert len(scores) == lst_len
     assert len(pvalues) == lst_len
     assert len(sequences) == lst_len
+    assert len(frequencies) == lst_len
     assert len(references) == lst_len
 
     # check if we want also the q-values
-    if not no_qvalue:  # we want the q-values
+    if not no_qvalue: 
         assert len(qvalues) == lst_len
 
-    if qval_t:  # apply the threshold on the q-values rather than on P-values
+    # apply the threshold on the q-values rather than on P-values
+    if qval_t:  
         assert (not no_qvalue)
-        assert len(qvalues) > 0   # we must have computed them
+        assert len(qvalues) > 0 
 
-    seqnames_thresh = []
-    starts_thresh = []
-    ends_thresh = []
-    strands_thresh = []
-    scores_thresh = []
-    pvalues_thresh = []
-    sequences_thresh = []
-    references_thresh = []
+    seqnames_thresh: List[str] = list() 
+    starts_thresh: List[int] = list()
+    ends_thresh: List[int] = list()
+    strands_thresh: List[str] = list() 
+    scores_thresh: List[np.double] = list()
+    pvalues_thresh: List[np.double] = list()
+    sequences_thresh: List[str] = list()
+    frequencies_thresh: List[int] = list()
+    references_thresh: List[str] = list()
 
     if not no_qvalue:
-        qvalues_thresh = []
+        qvalues_thresh: List[np.double] = list()
 
     for i in range(lst_len):
 
+        # ignore binding site candidates which does not appear in any sample
+        # if not required by tyhe user to analyze them
+        if not recomb and int(frequencies[i]) == 0:
+                continue
+
         if not qval_t:  # apply threshold on P-values
-            pvalue = pvalues[i]
+            pvalue: np.double = pvalues[i]
 
             if pvalue < threshold:
-
                 # only the sequences with a P-value under the threshold survive
                 seqnames_thresh.append(seqnames[i])
                 starts_thresh.append(starts[i])
@@ -698,6 +667,7 @@ def build_df(motif,
                 scores_thresh.append(scores[i])
                 pvalues_thresh.append(pvalues[i])
                 sequences_thresh.append(sequences[i])
+                frequencies_thresh.append(frequencies[i])
                 references_thresh.append(references[i])
 
                 if not no_qvalue:
@@ -705,7 +675,7 @@ def build_df(motif,
             # end if
 
         else:  # apply threshold on q-values
-            qvalue = qvalues[i]
+            qvalue: np.double = qvalues[i]
 
             if qvalue < threshold:
 
@@ -717,6 +687,7 @@ def build_df(motif,
                 scores_thresh.append(scores[i])
                 pvalues_thresh.append(pvalues[i])
                 sequences_thresh.append(sequences[i])
+                frequencies_thresh.append(frequencies[i])
                 references_thresh.append(references[i])
 
                 # the last control statement, in the if, in this case is not
@@ -727,19 +698,11 @@ def build_df(motif,
         # end if
     # end for
 
-    df_len = len(seqnames_thresh)
+    df_len: int = len(seqnames_thresh)
 
     # TF's name and ID list
-    motif_ids = [motif.getMotifID()] * df_len
-    motif_names = [motif.getMotifName()] * df_len
-
-    """
-        build the final data frame
-        
-        structure:
-        
-           |motif_id|motif_alt_id|sequence_name|start|stop|strand|score|p-value|q-value|matched_sequence|reference|   
-    """
+    motif_ids: List[str] = [motif.getMotifID()] * df_len
+    motif_names: List[str] = [motif.getMotifName()] * df_len
 
     df = pd.DataFrame()
     df['motif_id'] = motif_ids
@@ -757,6 +720,7 @@ def build_df(motif,
 
     # finish to build the data frame
     df['matched_sequence'] = sequences_thresh
+    df['haplotype_frequency'] = frequencies_thresh 
     df['reference'] = references_thresh
 
     # sort entries by p-value
@@ -771,24 +735,33 @@ def build_df(motif,
 
 
 def print_scoring_msg(no_reverse, motif):
-    if not isinstance(motif, Motif):
-        raise ValueException('\n\nERROR: The given motif is not an instance of Motif')
+    """Print a message to display on terminal during scoring step of
+    GRAFIMO analysis.
 
-    motif_id = motif.getMotifID()
-    fw_id = ''.join(['+', motif_id])
+    Parameters
+    ----------
+    no_reverse : bool
+        if True will be considered only the forward DNA strand
+    motif : Motif
+        Motif object
+    """
+
+    if not isinstance(motif, Motif):
+        errmsg: str = '\n\nERROR: The given motif is not an instance of Motif'
+        raise ValueException(errmsg)
+
+    motif_id: str = motif.getMotifID()
+    fw_id: str = ''.join(['+', motif_id])
 
     # we take into account also the reverse complement
     if not no_reverse:
-        rev_id = ''.join(['-', motif_id])
+        rev_id: str = ''.join(['-', motif_id])
 
-    print()  # newline
-    print('Scoring hits for motif', fw_id)
+    print('\nScoring hits for motif', fw_id)
 
     # if we score also the reverse complement
     if not no_reverse:
-        print('Scoring hits for motif', rev_id)
-
-    print()  # newline
+        print('Scoring hits for motif', rev_id, end="\n\n")
 
 # end of print_scoring_msg()
 

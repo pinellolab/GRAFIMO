@@ -1,23 +1,30 @@
+"""Functions to query a given genome variation graph or a set of graphs.
+Each query will extract the k-mers (k == motif width) from the graph
+in the given set of genomic regions.
+
+Th genomic regions are given as set of coordinates in a UCSC BED file.
+
+The k-mers are both from the forward and reverse strand of the genomic 
+sequence.
+
+By default, are extracted all the possible recombinant k-mers that can 
+be obtained using the genomic variants defined in the used VCF file, in 
+the queried regions. Then they are filtered to keep only those belonging 
+to the haplotypes of the samples present in the VCF file used to build 
+the genome variation graph.
+
+The user can also decide to consider all possible recombinant using the
+--recomb option, while calling GRAFIMO from the command line.
 """
 
-@author: Manuel Tognon
 
-@email: manu.tognon@gmail.com
-@email: manuel.tognon@studenti.univr.it
-
-Extraction of the regions defined in the input BED file from the
-queried genome graphs.
-
-Are conceptually extracted subgraphs, from the genome graph,
-corresponding to the regions defined in the input BED file.
-
-"""
-
-
-from grafimo.GRAFIMOException import SubprocessError, NotValidFFException, FileReadingException, VGException
-from grafimo.utils import die, correct_path, CHROMS_LIST, printProgressBar, sigint_handler
+from grafimo.GRAFIMOException import SubprocessError, NotValidFFException, \
+    FileReadingException, VGException
+from grafimo.utils import die, CHROMS_LIST, printProgressBar, sigint_handler
 from grafimo.score_sequences import ResultTmp
+from grafimo.workflow import Findmotif
 from grafimo.motif import Motif
+from typing import List, Optional, Dict, Tuple
 import multiprocessing as mp
 import subprocess
 import signal
@@ -28,33 +35,54 @@ import sys
 import os
 
 
-verbose = False  # global variable
+verbose: bool = False  # global variable
 
 
-def get_regions(motif,
-                args_obj):
+def scan_graph(
+    motif: Motif,
+    args_obj: Findmotif
+) -> str:
+    """Obtain all the sequences of length K from the given genome
+    variation graph, where K is the motif length.
+
+    The sequences are obtained from the regions defined in the input
+    BED file (UCSC BED file format).
+
+    The sequences extracted correspond to all possible recombinant
+    ones which can be obtained using the genomic variants given in the
+    VCF file used to build the queried VG. 
+    
+    Then, they are filtered to keep only those beloning to haplotypes of 
+    the samples from which the VCF file variants come from.
+
+    The user can also decide to keep them all using the --recomb option. 
+    
+    Parameters
+    ----------
+    motif : Motif 
+        DNA motif PWM to search on the VG
+    args_obj : Findmotif  
+        container of the arguments used during genome variation graph
+        scanning
+        
+    Returns
+    -------
+    str 
+        location of the files with the sequences extracted
     """
-        Compute all sequences of length L (L is the
-        motif width) from the VG(s).
-        The sequences are extracted from the regions defined
-        in the input BED file.
-        ----
-        Parameters:
-            motif (Motif) : motif to search on the VG
-            args_obj (Findmotif) : object storing the arguments
-                                    required to extract the
-                                    regions defined in the BED
-                                    file, from the VG(s)
-        ----
-        Return:
-            sequence_loc (str) : location of the tmp files,
-                                    containing the extracted
-                                    sequences
-    """
+
+    errmsg: str
+    vg: str
+    chroms: List[str]
 
     # check the input arguments
     if not isinstance(motif, Motif):
         errmsg = "\n\nERROR: unknown motif object type"
+        raise ValueError(errmsg)
+
+    if not isinstance(args_obj, Findmotif):
+        errmsg = "Unknown arguments object type. "
+        errmsg += "Cannot scan the genome variation graph. Exiting"
         raise ValueError(errmsg)
 
     if args_obj.has_graph_genome():
@@ -72,62 +100,51 @@ def get_regions(motif,
         raise VGException("\n\nERROR: the genome variation graph is missing")
     # end if
 
-    bedfile = args_obj.get_bedfile()
-    motif_width = motif.getWidth()
-    chroms = args_obj.get_chroms()
-    cores = args_obj.get_cores()
+    bedfile: str = args_obj.get_bedfile()
+    motif_width: int = motif.getWidth()
+    cores: int = args_obj.get_cores()
 
     global verbose
     verbose = args_obj.get_verbose()
 
     print("\nExtracting regions defined in", bedfile, "\n")
 
-    # read the regions where search the motif occurrences from the given BED file
-    regions = getBEDregions(bedfile)
-
-    if verbose:
-        print("\nFound", len(regions), "regions in", bedfile)
-
-    if chroms:
-        # user defined subset of the chromosomes
-        chr_list = [''.join(['chr', c]) for c in chroms]
+    # read the regions where search the motif occurrences from the given 
+    # BED file
+    regions: Dict
+    region_num: int
+    regions, region_num = getBEDregions(bedfile)
+    
+    if(args_obj.get_chroms_num() == 1 and 
+        args_obj.get_chroms()[0] == 'ALL_CHROMS'):
+        chroms = list(regions.keys())
     else:
-        # all the chromosomes
-        chr_list = [''.join(['chr', c]) for c in CHROMS_LIST]
-    # end if
+        chroms = [''.join(['chr', c]) for c in args_obj.get_chroms()]
+    
+    if verbose:
+        print("\nFound", region_num, "regions in", bedfile)
+
 
     # create a tmp working directory
-    tmpwd = tempfile.mkdtemp(prefix='grafimo_')
-
-    # if the tmp directory name already exists remove it
-    # this shouldn't happen, but to be sure
-    if os.path.isdir(tmpwd):
-        cmd = 'rm -rf {0}'.format(tmpwd)
-        code = subprocess.call(cmd, shell=True)
-
-        if code != 0:
-            raise SubprocessError(' '.join(["an error occurred executing", cmd, ". Exiting"]))
-    # end if
-
-    cmd = 'mkdir -p {0}'.format(tmpwd)
-    code = subprocess.call(cmd, shell=True)
-    if code != 0:
-        raise SubprocessError(' '.join(["an error occurred executing", cmd, ". Exiting"]))
+    tmpwd: str = tempfile.mkdtemp(prefix='grafimo_')
 
     # get the new location of graphs wrt the tmp dir
-    cwd = os.getcwd()
+    cwd: str = os.getcwd()
 
     # enter the tmp dir where store the extracted sequences
     os.chdir(tmpwd)
 
-    if verbose:
-        start_re = time.time()
+    # list of queries
+    queries: List[str] = list()  
 
     # redefine default SIGINT handler
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    pool = mp.Pool(processes=cores)  # use #cores processes
-    signal.signal(signal.SIGINT, original_sigint_handler)  # overwrite the default SIGINT handler to exit gracefully
+    pool: mp.Pool = mp.Pool(processes=cores)  # use no. cores processes
+     # overwrite the default SIGINT handler to exit gracefully
     # https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python
+    signal.signal(signal.SIGINT, original_sigint_handler) 
+
+    positions: List[Tuple[int, int]]
 
     if args_obj.has_graph_genome_dir():
 
@@ -138,159 +155,182 @@ def get_regions(motif,
             vg = ''.join([vg, "/"])
         # end if
 
-        queries = []  # set of queries
+        for chrom in chroms:
+            positions = regions[chrom]
 
-        for region in regions:
-            chrom = region['chr']
-            start = region['start']
-            stop = region['stop']
-
-            if chrom in chr_list:
+            for pos in positions:
+                start: int = pos[0]
+                stop: int = pos[1]
 
                 # the chromosome is among the ones to query
-                region_index = ''.join([chrom, ':', str(start), '-', str(stop)])
-                region_name = ''.join([chrom, '_', str(start), '-', str(stop)])
-                seqs = correct_path('./', region_name, '.tsv')
+                region_index:str = ''.join([chrom.split('chr')[-1], ':', 
+                                            str(start), '-', str(stop)])
+                region_name: str = ''.join([chrom, '_', str(start), '-', 
+                                            str(stop)])
+                seqs: str = os.path.join('.', ''.join([region_name, '.tsv']))
 
-                xg = ''.join([vg, chrom, '.xg'])
+                xg: str = ''.join([vg, chrom, '.xg'])
+                # the GBWT must have the same prefix as XG
+                gbwt: str = ''.join([vg, chrom, '.gbwt'])  
+
+                if not os.path.exists(xg):
+                    errmsg = ''.join(["\n\nERROR: unable to use ", xg, 
+                                      ". Exiting"])
+                    raise FileNotFoundError(errmsg)
+
+                if not os.path.isfile(gbwt):
+                    errmsg = "ERROR: unable to find GBWT file for"
+                    errmsg = ' '.join([errmsg, xg])
+                    raise FileNotFoundError(errmsg)
+
+                query: str = 'vg find -p {0} -x {1} -H {2} -K {3} -E > {4}'.format(region_index, 
+                                                                                   xg, 
+                                                                                   gbwt, 
+                                                                                   motif_width, 
+                                                                                   seqs)
+                queries.append(query)
+
+        # extract from the graph the binding site candidates to score
+        get_kmers(queries, pool, verbose)
+
+    elif args_obj.has_graph_genome():
+
+        for chrom in chroms:
+            positions = regions[chrom]
+
+            for pos in positions:
+                start: int = pos[0]
+                stop: int = pos[1]
+
+                # the chromosome is among the ones to query
+                region_index: str = ''.join([chrom.split('chr')[-1], ':', 
+                                             str(start), '-', str(stop)])
+                region_name: str = ''.join([chrom, '_', str(start), '-', 
+                                            str(stop)])
+                seqs: str = os.path.join('.', ''.join([region_name, '.tsv']))
+
+                xg: str = vg
+                xg_prefix: str = xg.split(".xg")[-2]
+                # the GBWT must have the same prefix as XG
+                gbwt: str = ''.join([xg_prefix, '.gbwt']) 
 
                 if not os.path.exists(xg):
                     errmsg = ''.join(["\n\nERROR: unable to use ", xg, ". Exiting"])
                     raise FileNotFoundError(errmsg)
 
-                query = 'vg find -x {0} -E -p {1} -K {2} > {3}'.format(xg, region_index, motif_width, seqs)
-                queries.append(query)
-
-        # extract regions
-        try:
-
-            # query the VGs
-            res = (pool.map_async(get_seqs, queries))
-
-            if not verbose:
-                it = 0
-                while (True):
-                    if res.ready():
-                        # when finished call for the last time printProgressBar()
-                        printProgressBar(tot, tot, prefix='Progress:',
-                                         suffix='Complete', length=50)
-                        break
-                    # end if
-                    if it == 0:
-                        tot = res._number_left
-
-                    remaining = res._number_left
-                    printProgressBar((tot - remaining), tot, prefix='Progress:',
-                                     suffix='Complete', length=50)
-                    time.sleep(2)
-                    it += 1
-                # end while
-            # end if
-
-            ret = res.get(60 * 60 * 60)  # does not ignore signals
-
-        except KeyboardInterrupt:
-            pool.terminate()
-            sigint_handler()
-
-        else:
-            pool.close()
-
-            if verbose:
-                end_re = time.time()
-                msg = ''.join(["Extracted all regions from VGs stored in ", vg, ", in ",
-                               str(end_re - start_re), "s"])
-                print(msg)
-            # end if
-        # end try
-
-    elif args_obj.has_graph_genome():
-
-        queries = []  # set of queries
-
-        for region in regions:
-            chrom = region['chr']
-            start = region['start']
-            stop = region['stop']
-
-            if chrom in chr_list:
-
-                # the chromosome is among the ones to query
-                region_index = ''.join([chrom, ':', str(start), '-', str(stop)])
-                region_name = ''.join([chrom, '_', str(start), '-', str(stop)])
-                seqs = correct_path('./', region_name, '.tsv')
-
-                if not os.path.exists(vg):
-                    errmsg = ''.join(["\n\nERROR: unable to use ", vg, ". Exiting"])
+                if not os.path.isfile(gbwt):
+                    errmsg = "ERROR: unable to find GBWT file for"
+                    errmsg = ' '.join([errmsg, xg])
                     raise FileNotFoundError(errmsg)
 
-                query = 'vg find -x {0} -E -p {1} -K {2} > {3}'.format(vg, region_index, motif_width, seqs)
+                query = 'vg find -p {0} -x {1} -H {2} -K {3} -E > {4}'.format(region_index, 
+                                                                              xg, 
+                                                                              gbwt, 
+                                                                              motif_width, 
+                                                                              seqs)
                 queries.append(query)
 
-        # extract regions
-        try:
-
-            # query the VGs
-            res = (pool.map_async(get_seqs, queries))
-
-            if not verbose:
-                it = 0
-                while (True):
-                    if res.ready():
-                        # when finished call for the last time printProgressBar()
-                        printProgressBar(tot, tot, prefix='Progress:',
-                                         suffix='Complete', length=50)
-                        break
-                    # end if
-                    if it == 0:
-                        tot = res._number_left
-
-                    remaining = res._number_left
-                    printProgressBar((tot - remaining), tot, prefix='Progress:',
-                                     suffix='Complete', length=50)
-                    time.sleep(2)
-                    it += 1
-                # end while
-            # end if
-
-            ret = res.get(60 * 60 * 60)  # does not ignore signals
-
-        except KeyboardInterrupt:
-            pool.terminate()
-            sigint_handler()
-
-        else:
-            pool.close()
-
-            if verbose:
-                end_re = time.time()
-                msg = ''.join(["Extracted all regions from VGs stored in ", vg, ", in ",
-                               str(end_re - start_re), "s"])
-                print(msg)
-            # end if
-        # end try
+        # extract from the graph the binding site candidates to score
+        get_kmers(queries, pool, verbose)
 
     else:
-        raise Exception("\n\nERROR: do not know how to proceed". Exiting)
+        raise Exception("\n\nERROR: do not know how to proceed. Exiting")
     # end if
 
-    sequence_loc = os.getcwd()  # the extracted sequences are store in the cwd
-    os.chdir(cwd)  # get back to the origin
+    # the extracted sequences are store in the cwd
+    sequence_loc: str = os.getcwd()  
+    os.chdir(cwd) 
 
     return sequence_loc
 
-# end of get_regions()
+# end of scan_graph()
 
 
-def get_xg_loc(toXGpath):
+def get_kmers(
+    queries: List[str], 
+    pool: mp.Pool,  
+    verbose: Optional[bool] = False
+) -> None:
+    """Extract the genomic sequences (both from reverse and forward 
+    strands)in the queried regions from the VG.
+
+    The sequence extraction is perfromed in parallel working on a 
+    user defined number of cores (by default all the cores available).
+
+    Parameters
+    ----------
+    queries : list
+        set of queries to perform on the graph to extract the motif
+        occurrence candidates
+    pool : multiprocessing.Pool
+        pool of parallel processes to run  
+    verbose : bool, optional
+        flag used to define if additional information has to printed
+
     """
-        Get the path to the directory that contains the whole genome XG
-        ----
-        Parameters:
-            toXGpath(str) : path to the xg
-        ----
-        Returns:
-            toXGpath (str) : path to the directory containing the xg
+
+    if not isinstance(queries, list):
+        raise Exception
+
+    if verbose:
+        start_re: float = time.time()
+
+    # extract regions
+    try:
+        # query the VGs
+        res: mp.pool.MapResult = (pool.map_async(get_seqs, queries))
+
+        if not verbose:
+            it: int = 0
+            while (True):
+                if res.ready():
+                    # when finished call for the last time 
+                    # printProgressBar()
+                    printProgressBar(tot, tot, prefix='Progress:',
+                                    suffix='Complete', length=50)
+                    break
+                # end if
+                if it == 0:
+                    tot = res._number_left
+
+                remaining = res._number_left
+                printProgressBar((tot - remaining), tot, prefix='Progress:',
+                                  suffix='Complete', length=50)
+                time.sleep(2)
+                it += 1
+            # end while
+        # end if
+
+        ret: list = res.get(60 * 60 * 60)  # does not ignore signals
+
+    except KeyboardInterrupt:
+        pool.terminate()
+        sigint_handler()
+
+    else:
+        pool.close()
+
+        if verbose:
+            end_re: float = time.time()
+            print(
+                "Extracted sequences from all regions in %.2fs" % (end_re - start_re)
+                )
+        # end if
+    # end try
+
+
+def get_xg_loc(toXGpath: str) -> str:
+    """Get the path to the whole genome variation graphXG index
+
+    Parameters
+    ----------
+    toXGpath : str
+        path to the genome variation graph XG index
+        
+    Returns
+    -------
+    str 
+        path to the directory containing the graph XG index
     """
 
     for i in range(1, len(toXGpath)):
@@ -299,34 +339,37 @@ def get_xg_loc(toXGpath):
             break
     # end for
 
-    toXGpath = toXGpath[:bp]
+    toXGpath_dir: str = toXGpath[:bp]
 
-    return toXGpath
+    return toXGpath_dir
 # end of get_xg_loc()
 
 
-def get_seqs(query):
-    """
-        Get the sequences of length L inside the queried
-        region (L = motif width)
-        ----
-        Prameters:
-            query (str) : call to VG to extract all sequences of length L
-                            (L = motif width) from the given VG
-        ----
-        Returns:
-            None
+def get_seqs(query: str) -> None:
+    """Retrieve the k-mers withing the current genomic region, where k
+    is the motif length.
+
+    The sequences are retrieved by calling the vg find built-in method
+    of VG.
+        
+    Parameters
+    ----------
+    query : str
+        query to apply on the genome variation graph        
+
     """
 
     if verbose:
-        region = query.split('-p')[1].split('-K')[0]
+        region: str = query.split('-p')[1].split('-K')[0]
         print("Extracting sequences from region:", region)
 
-    code = subprocess.call(query, shell=True)  # perform query
+    code: int = subprocess.call(query, shell=True)  # perform query
 
     if verbose:
         if code != 0:
-            warnmsg = ''.join(["A problem occurred during sequences extraction in ", region])
+            warnmsg: str = ''.join(
+                ["A problem occurred during sequences extraction in ", region]
+                )
             warnings.warn(warnmsg)
         # end if
     # end if
@@ -334,63 +377,103 @@ def get_seqs(query):
 # end of get_seqs()
 
 
-def isGraph_genome_xg(vg):
-    """
-        Check if the given genome variation graph is in xg format
-        ----
-        Parameters:
-            vg (str) : genome variation graph
-        ----
-        Returns:
-            (bool)
+def isGraph_genome_xg(vg: str) -> bool:
+    """Check if the given genome variation graph is in XG format.
+
+    To have a genome variation graph in XG format it must have been 
+    indexed.
+
+    Parameters
+    ----------
+    vg : str 
+        path to a genome variation graph
+        
+    Returns
+    -------
+    bool
+        is the given genome variation graph in XG format
     """
 
+    errmsg: str
+
     if not isinstance(vg, str):
-        raise VGException("\n\nERROR: Invalid path to the genome graph. Cannot proceed")
+        errmsg = "\n\nERROR: Invalid path to the genome graph. Cannot proceed"
+        raise VGException(errmsg)
 
     if vg.split('.')[-1] == 'xg':
         return True
     elif vg.split('.') == 'vg':
         return False
     else:
-        errmsg = "\n\nERROR: do not know what to do with the given genome graph. Only XG or VG format allowed"
+        errmsg = "\n\nERROR: do not know what to do with the given genome graph." 
+        errmsg += " Only XG or VG format allowed"
         raise VGException(errmsg)
 
 # end of isGraph_genome_xg()
 
 
-def getBEDregions(bedfile):
-    """
-        Read the BED file with regions to analyze
-        ----
-        Parameters:
-            bedfile (str) : path to the BED file
-        ----
-        Returns:
-            regions (list) : regions defined in the BED file
+def getBEDregions(bedfile: str) -> Tuple[Dict, int]:
+    """Read the BED file containing the genomic regions to scan for the 
+    occurrences of the given motif.
+
+    The regions are stored in Dict with the chromosome numbers as keys.
+    This allows less overhead while loading the same genome variation
+    graph on the cache when executing sequences extraction. 
+
+    Parameters
+    ----------
+    bedfile : str 
+        path to the BED file
+        
+    Returns
+    -------
+    dict
+        regions defined in the BED file grouped by chromosome
+    int 
+        number of regions contained in the BED file
     """
 
     if bedfile.split('.')[-1] != 'bed':  # not a BED file
-        raise NotValidFFException("The given BED file is not in BED format")
+        raise NotValidFFException("The given file is not a BED file")
 
-    regions = []
+    regions:Dict
+    region_num: int
+    chrom: str
+    start: int
+    stop: int
 
-    # start reading
+    regions = dict()
+    region_num = 0 
+
     try:
-        with open(bedfile, mode='r') as inbed:  # open the BED file in read only mode
+        with open(bedfile, mode='r') as inbed:  
             for line in inbed:
-                chrom, start, stop = line.split('\t')[0:3]
-                region = {'chr': chrom, 'start': start, 'stop': stop}
-                regions.append(region)
+                bedline = line.split()
+                
+                if len(bedline) < 3 or len(bedline) > 12:
+                    errmsg: str = '\n'.join(
+                        ["The given BED file is not in UCSC BED file format.",
+                         "Please refer to https://genome.ucsc.edu/FAQ/FAQformat.html#format1\n"]
+                         )
+                    raise NotValidFFException(errmsg)
+                
+                chrom, start, stop = bedline[0:3]
+                if chrom not in regions.keys():
+                    regions.update({chrom: [(start, stop)]})
+                else:
+                    regions[chrom].append((start, stop))
+
+                region_num += 1
+                # end if
             # end for
         # end with
 
     except:  # not able to read the BED file
-        msg = ' '.join(["\n\nError: unable to read", bedfile])
+        msg: str = ' '.join(["\n\nError: unable to read", bedfile])
         raise FileReadingException(msg)
 
     else:
-        return regions
+        return regions, region_num
 
     finally:
         inbed.close()  # close the file stream

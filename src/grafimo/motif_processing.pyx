@@ -1,47 +1,59 @@
 # cython: profile=False, emit_code_comments=False, language_level=3
 
+"""Functions to process the DNA motif Position Weight Matrix (PWM).
+
+The PWM values are processed in order to obtain a scaled PWM and a 
+corresponding P-value matrix, which is computed using a dynamic
+programming algorithm (Staden, 1994)
+
+The functions are written in Cython and for each one of them a Python
+wrapper to call them is provided.
+
 """
 
-@author: Manuel Tognon
 
-@email: manu.tognon@gmail.com
-@email: manuel.tognon@studenti.univr.it
-
-Cython script that contains some functions to process the motif
-matrix
-
-"""
-
-
-from libc.stdlib cimport strtod
 from grafimo.utils import DNA_ALPHABET, lg2, RANGE, isListEqual
-from grafimo.GRAFIMOException import NotValidAlphabetException, FileReadingException, NoDataFrameException, \
-                                        NotValidMotifMatrixException, NotValidBGException, ScaledScoreMatrixException
+from grafimo.GRAFIMOException import NotValidAlphabetException, \
+    FileReadingException, NoDataFrameException, NotValidMotifMatrixException, \
+    NotValidBGException, ScaledScoreMatrixException
+from grafimo.motif import Motif
+from typing import List, Dict, Optional
+from libc.stdlib cimport strtod
 import pandas as pd
 import numpy as np
 
 
 ### read the background file ###
 cdef creadBGFile(bg_file):
-    """
-        Read the background file given by the user
-        ----
-        Parameters:
-            bg_file (str) : path to the background file
-        ----
-        Returns:
-            bg_dict (dict) : dictionary that contains the background probabilities
-                             defined in the input file
+    """Read the background file, which contains the background 
+    frequencies for each nucleotide.
+
+    The background file is given in Markov Background Model Format
+    (http://meme-suite.org/doc/bfile-format.html).
+
+    Parameters
+    ----------
+    bg_file : str 
+        path to the background file
+        
+    Returns
+    -------
+    Dict
+        dictionary containing the background probabilities
     """
 
     cdef double prob
     cdef char** endptr = NULL
 
-    bg_dict = {}
+    bg_dict: dict
+    found_nucs: set
+    errmsg: str
+
+    bg_dict = dict()
     found_nucs = set()
 
     try:
-        bgf = open(bg_file, mode='r') # open the file in read only mode
+        bgf = open(bg_file, mode='r') 
 
         for line in bgf:
 
@@ -59,8 +71,10 @@ cdef creadBGFile(bg_file):
                 errmsg = "\n\nERROR: the read symbol is not part of the DNA alphabet"
                 raise NotValidAlphabetException(errmsg)
 
-            if len(found_nucs) == len(DNA_ALPHABET): # read all the nucleotides
-                if found_nucs != set(DNA_ALPHABET): # some symbol was read twice or more
+            if len(found_nucs) == len(DNA_ALPHABET):
+                # read all the nucleotides 
+                if found_nucs != set(DNA_ALPHABET): 
+                    # some symbol was read twice or more
                     errmsg = "\n\nERROR: some alphabet symbols were read twice or more"
                     raise NotValidAlphabetException(errmsg)
 
@@ -81,34 +95,61 @@ cdef creadBGFile(bg_file):
 # end creadBGfile()
 
 
-def readBGfile(bg_file):
-    """ Python call function """
+def readBGfile(bg_file: str) -> Dict:
+    """Python wrapper for creadBGfile() function 
+
+    Read the background file, which contains the background 
+    frequencies for each nucleotide.
+
+    The background file is given in Markov Background Model Format
+    (http://meme-suite.org/doc/bfile-format.html).
+
+    Parameters
+    ----------
+    bg_file : str 
+        path to the background file
+        
+    Returns
+    -------
+    Dict
+        dictionary containing the background probabilities
+    """
 
     return creadBGFile(bg_file)
 
 
 ### uniform background distribution ###
 cdef cget_uniformBG(alphabet):
-    """
-        Returns a uniform probability distribution for a given alphabet
-        ----
-        Parameters:
-            alphabet (list) : alphabet in list form
-        ----
-            Returns:
-                bg_dict (dict) : dictionary of the uniform probability
+    """Compute a uniform probability background distribution for a given 
+    alphabet of characters
+        
+    Parameters
+    ----------
+    alphabet : list 
+        alphabet 
+        
+    Returns
+    -------
+    Dict
+        dictionary containing a uniform probability background 
+        distribution
     """
 
+    errmsg: str
     if not isinstance(alphabet, list):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not in a list")
+        errmsg = "\n\nERROR: the given alphabet is not in a list"
+        raise NotValidAlphabetException(errmsg)
 
     if not isListEqual(alphabet, DNA_ALPHABET):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not a valid DNA alphabet")
+        errmsg = "\n\nERROR: the given alphabet is not a valid DNA alphabet"
+        raise NotValidAlphabetException(errmsg)
 
     cdef int alpha_len # length of the alphabet
     cdef double unifp # uniform probability value
 
-    bg_dict = {}
+    bg_dict: Dict
+
+    bg_dict = dict()
 
     alpha_len = len(alphabet)
     unifp = 1.0 / <double>alpha_len
@@ -120,53 +161,88 @@ cdef cget_uniformBG(alphabet):
 # end cget_uniformBG()
 
 
-def get_uniformBG(alphabet):
-    """ Python call function """
+def get_uniformBG(alphabet: List[str]) -> Dict:
+    """Python wrapper for cget_uniformBG() function 
+    
+    Compute a uniform probability background distribution for a given 
+    alphabet of characters
+        
+    Parameters
+    ----------
+    alphabet : list 
+        alphabet 
+        
+    Returns
+    -------
+    Dict
+        dictionary containing a uniform probability background 
+        distribution
+    """
 
     return cget_uniformBG(alphabet)
 
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, bgs,
-                                    int width, alphabet):
-    """
-        Apply the pseudocount to raw counts matrix (JASPAR motif file)
-        ----
-        Params:
-            counts_matrix (pd.DataFrame) : raw counts matrix 
-            probs_matrix (pd.DataFrame) : probability matrix 
-            pseudocount (np.double) : pseudocount to apply to the motif
-            width (int) : motif width 
-            bgs (dict) : background distribution
-            alphabet (list) : alphabet of the motif
-        ----
-        Returns:
-            proc_matrix (pd.DataFrame) : resulting probability matrix 
-                                            (pseudocount applied)
+cdef capply_pseudocount_jaspar(
+    counts_matrix, 
+    probs_matrix, 
+    double pseudocount, 
+    bgs,
+    int width, 
+    alphabet
+):
+    """Apply the pseudocount value to the raw counts matrix PWM for the 
+    motif given in JASPAR file format.
+
+    Parameters
+    ----------
+    counts_matrix : pandas.DataFrame
+        raw counts PWM matrix 
+    probs_matrix : pandas.DataFrame 
+        probability PWM matrix 
+    pseudocount : numpy.double  
+        pseudocount to add to the raw counts PWM motif
+    width : int
+        motif width 
+    bgs : dict 
+        background probability distribution of the DNA alphabet
+    alphabet : list 
+        DNA motif alphabet
+        
+    Returns
+    -------
+    pandas.DataFrame 
+        resulting probability matrix with the pseudocount applied
     """
 
+    errmsg: str
     if not isinstance(counts_matrix, pd.DataFrame):
         errmsg = "\n\nERROR: the given motif matrix must be an instance of pandas.DataFrame"
         raise NoDataFrameException(errmsg)
 
     if counts_matrix.empty:
-        raise NotValidMotifMatrixException("\n\nERROR: the given motif matrix is empty")
+        errmsg = "\n\nERROR: the given motif matrix is empty"
+        raise NotValidMotifMatrixException(errmsg)
 
     if not isinstance(probs_matrix, pd.DataFrame):
         errmsg = "\n\nERROR: the given motif matrix must be an instance of pandas.DataFrame"
         raise NoDataFrameException(errmsg)
 
     if probs_matrix.empty:
-        raise NotValidMotifMatrixException("\n\nERROR: the given motif matrix is empty")
+        errmsg = "\n\nERROR: the given motif matrix is empty"
+        raise NotValidMotifMatrixException(errmsg)
 
     if not isinstance(alphabet, list):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not in a list")
+        errmsg = "\n\nERROR: the given alphabet is not in a list"
+        raise NotValidAlphabetException(errmsg)
 
     if not isListEqual(alphabet, DNA_ALPHABET):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not a valid DNA alphabet")
+        errmsg = "\n\nERROR: the given alphabet is not a valid DNA alphabet"
+        raise NotValidAlphabetException(errmsg)
 
     if not isinstance(bgs, dict):
-        raise NotValidBGException("\n\nERROR: the background must be in a dict data-structure")
+        errmsg = "\n\nERROR: the background must be in a dict data-structure"
+        raise NotValidBGException(errmsg)
 
     assert pseudocount > 0
     assert width > 0
@@ -179,8 +255,9 @@ cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, 
 
     pseudo = pseudocount
 
-    proc_matrix = pd.DataFrame(index=list(counts_matrix.index), columns=list(counts_matrix.columns),
-                                data=np.double(0))
+    proc_matrix = pd.DataFrame(index=list(counts_matrix.index), 
+                               columns=list(counts_matrix.columns), 
+                               data=np.double(0))
 
     for j in range(width):
 
@@ -203,46 +280,97 @@ cdef capply_pseudocount_jaspar(counts_matrix, probs_matrix, double pseudocount, 
 # end capply_pseudocount_jaspar()
 
 
-def apply_pseudocount_jaspar(counts_matrix, probs_matrix, pseudocount, bgs,
-                                width, alphabet):
-    """ Python call function """
+def apply_pseudocount_jaspar(
+    counts_matrix: pd.DataFrame, 
+    probs_matrix: pd.DataFrame, 
+    pseudocount: np.double, 
+    bgs: dict,
+    width: int, 
+    alphabet: List[str]
+) -> pd.DataFrame:
+    """Python wrapper for capply_pseudocount_jaspar() function 
+    
+    Apply the pseudocount value to the raw counts matrix PWM for the 
+    motif given in JASPAR file format.
 
-    return capply_pseudocount_jaspar(counts_matrix, probs_matrix, pseudocount, bgs,
-                                        width, alphabet)
+    Parameters
+    ----------
+    counts_matrix : pandas.DataFrame
+        raw counts PWM matrix 
+    probs_matrix : pandas.DataFrame 
+        probability PWM matrix 
+    pseudocount : numpy.double  
+        pseudocount to add to the raw counts PWM motif
+    width : int
+        motif width 
+    bgs : dict 
+        background probability distribution of the DNA alphabet
+    alphabet : list 
+        DNA motif alphabet
+        
+    Returns
+    -------
+    pandas.DataFrame 
+        resulting probability matrix with the pseudocount applied
+    """
+
+    return capply_pseudocount_jaspar(counts_matrix, probs_matrix, pseudocount, 
+                                     bgs, width, alphabet)
 
 
 ### post-process meme motif ###
-cdef capply_pseudocount_meme(probs_matrix, double pseudocount, int site_counts, int width, bgs, alphabet):
-    """
-        Add pseudocount to the motif matrix (MEME format)
-        ----
-        Params:
-            probs_matrix (pd.DataFrame) : probability matrix of the motif
-            pseudocount (np.double) : pseudocount to apply to the motif matrix
-            site_counts (int) : site counts of the motif
-            width (int) : motif width
-            bgs (dict) : background distribution 
-            alphabet (list) : motif alphabet
-        ----
-        Returns:
-             proc_motif (pd.DataFrame) : processed probability matrix
+cdef capply_pseudocount_meme(
+    probs_matrix, 
+    double pseudocount, 
+    int site_counts, 
+    int width, 
+    bgs, 
+    alphabet
+):
+    """Add pseudocount value to the probability motif PWM matrix in MEME 
+    file format.
+        
+    Parameters:
+    probs_matrix : pandas.DataFrame
+        motif probability PWM matrix
+    pseudocount : numpy.double
+        pseudocount to apply to the motif PWM matrix
+    site_counts : int 
+        motif site counts motif
+    width : int 
+        motif width
+    bgs : dict 
+        background probability distribution for the DNA motif alphabet 
+    alphabet : list 
+        DNA motif alphabet
+        
+    Returns
+    -------
+    pandas.DataFrame 
+        resulting probability matrix with the pseudocount applied
     """
 
+    errmsg: str
     if not isinstance(probs_matrix, pd.DataFrame):
-        errmsg = "\n\nERROR: the given motif matrix must be an instance of pandas.DataFrame"
+        errmsg = "\n\nERROR: the given motif matrix must be an instance of "
+        errmsg += "pandas.DataFrame"
         raise NoDataFrameException(errmsg)
 
     if probs_matrix.empty:
-        raise NotValidMotifMatrixException("\n\nERROR: the given motif matrix is empty")
+        errmsg = "\n\nERROR: the given motif matrix is empty"
+        raise NotValidMotifMatrixException(errmsg)
 
     if not isinstance(alphabet, list):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not in a list")
+        errmsg = "\n\nERROR: the given alphabet is not in a list"
+        raise NotValidAlphabetException(errmsg)
 
     if not isListEqual(alphabet, DNA_ALPHABET):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not a valid DNA alphabet")
+        errmsg = "\n\nERROR: the given alphabet is not a valid DNA alphabet"
+        raise NotValidAlphabetException(errmsg)
 
     if not isinstance(bgs, dict):
-        raise NotValidBGException("\n\nERROR: the background must be in a dict data-structure")
+        errmsg = "\n\nERROR: the background must be in a dict data-structure"
+        raise NotValidBGException(errmsg)
 
     assert pseudocount > 0
     assert site_counts > 0
@@ -252,8 +380,9 @@ cdef capply_pseudocount_meme(probs_matrix, double pseudocount, int site_counts, 
     cdef double bg
     cdef double count
 
-    proc_matrix = pd.DataFrame(index=list(probs_matrix.index), columns=list(probs_matrix.columns),
-                                data=np.double(0))
+    proc_matrix = pd.DataFrame(index=list(probs_matrix.index), 
+                               columns=list(probs_matrix.columns),  
+                               data=np.double(0))
 
     total_counts = <double>site_counts + pseudocount
 
@@ -261,8 +390,8 @@ cdef capply_pseudocount_meme(probs_matrix, double pseudocount, int site_counts, 
         for nuc in alphabet:
 
             bg = bgs[nuc]
-            count = ((probs_matrix.loc[nuc, j]*site_counts)+
-                     (pseudocount*bg))
+            count = ((probs_matrix.loc[nuc, j] * site_counts) + 
+                        (pseudocount * bg))
             proc_matrix.loc[nuc, j] = count / total_counts
         # end for
     # end for
@@ -271,43 +400,88 @@ cdef capply_pseudocount_meme(probs_matrix, double pseudocount, int site_counts, 
 # end of capply_pseudocount_meme()
 
 
-def apply_pseudocount_meme(probs_matrix, pseudocount, site_counts, width, bgs, alphabet):
-    """ Python call function """
+def apply_pseudocount_meme(
+    probs_matrix: pd.DataFrame, 
+    pseudocount: np.double, 
+    site_counts: int, 
+    width: int, 
+    bgs: Dict, 
+    alphabet: List[str]
+) -> pd.DataFrame:
+    """Python wrapper for capply_pseudocount_meme() function 
+    
+    Add pseudocount value to the probability motif PWM matrix in MEME 
+    file format.
+        
+    Parameters:
+    probs_matrix : pandas.DataFrame
+        motif probability PWM matrix
+    pseudocount : numpy.double
+        pseudocount to apply to the motif PWM matrix
+    site_counts : int 
+        motif site counts motif
+    width : int 
+        motif width
+    bgs : dict 
+        background probability distribution for the DNA motif alphabet 
+    alphabet : list 
+        DNA motif alphabet
+        
+    Returns
+    -------
+    pandas.DataFrame 
+        resulting probability matrix with the pseudocount applied
+    """
 
-    return capply_pseudocount_meme(probs_matrix, pseudocount, site_counts, width,
-                                   bgs, alphabet)
+    return capply_pseudocount_meme(probs_matrix, pseudocount, site_counts, 
+                                   width, bgs, alphabet)
 
 
 ### compute log-odds ###
 cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet):
-    """
-        Computes the log-odds scores for the motif probability matrix
-        ----
-        Params:
-            probs_matrix (pd.DataFrame) : motif probability matrix 
-            width (int) : width of the motif
-            bgs (dict) : background distribution
-            alphabet (list) : alphabet of the motif 
-        ----
-        Returns:
-             motif_log_odds (pd.DataFrame) : log-odds motif matrix
+    """Computes the log-odds scores from the values of the motif  
+    probability matrix.
+
+    This step is madatory either if the motif PWM has been given in
+    JASPAR or MEME file format 
+        
+    Parameters
+    ----------
+    probs_matrix : pd.DataFrame
+        motif probability matrix 
+    width : int 
+        motif width
+    bgs : dict 
+        background probability distribution
+    alphabet : list 
+        DNA motif alphabet 
+        
+    Returns
+    -------
+    pandas.DataFrame : 
+        motif matrix with log-odds values
     """
 
+    errmsg: str
     if not isinstance(probs_matrix, pd.DataFrame):
         errmsg = "\n\nERROR: the given motif matrix must be an instance of pandas.DataFrame"
         raise NoDataFrameException(errmsg)
 
     if probs_matrix.empty:
-        raise NotValidMotifMatrixException("\n\nERROR: the given motif matrix is empty")
+        errmsg = "\n\nERROR: the given motif matrix is empty"
+        raise NotValidMotifMatrixException(errmsg)
 
     if not isinstance(alphabet, list):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not in a list")
+        errmsg = "\n\nERROR: the given alphabet is not in a list"
+        raise NotValidAlphabetException(errmsg)
 
     if not isinstance(bgs, dict):
-        raise NotValidBGException("\n\nERROR: the background must be in a dict data-structure")
+        errmsg = "\n\nERROR: the background must be in a dict data-structure"
+        raise NotValidBGException(errmsg)
 
     if not isListEqual(alphabet, DNA_ALPHABET):
-        raise NotValidAlphabetException("\n\nERROR: the given alphabet is not a valid DNA alphabet")
+        errmsg = "\n\nERROR: the given alphabet is not a valid DNA alphabet"
+        raise NotValidAlphabetException(errmsg)
 
     assert width > 0
 
@@ -351,25 +525,60 @@ cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet):
 # end of ccompute_log_odds()
 
 
-def compute_log_odds(probs_matrix, width, bgs, alphabet):
-    """ Python call function """
+def compute_log_odds(
+    probs_matrix: pd.DataFrame, 
+    width: int, 
+    bgs: Dict, 
+    alphabet: List[str]
+) -> pd.DataFrame:
+    """Python wrapper function for compute_lo_odds() function 
+    
+    Computes the log-odds scores from the values of the motif  
+    probability matrix.
+
+    This step is madatory either if the motif PWM has been given in
+    JASPAR or MEME file format 
+        
+    Parameters
+    ----------
+    probs_matrix : pd.DataFrame
+        motif probability matrix 
+    width : int 
+        motif width
+    bgs : dict 
+        background probability distribution
+    alphabet : list 
+        DNA motif alphabet 
+        
+    Returns
+    -------
+    pandas.DataFrame : 
+        motif matrix with log-odds values
+    """
 
     return ccompute_log_odds(probs_matrix, width, bgs, alphabet)
 
 
 ### DP p-value matrix computation ###
 cdef ccomp_pval_mat(motif):
-    """
-        Computes the p-value matrix needed for the computation of the p-value,
-        using a Dynamic-Programming algorithm
-        ----
-        Parameters:
-            motif (Motif) : motif object
-        ----
-        Returns:
-            pval_mat (np.array) : p-value matrix computed from the motif scores
+    """Computes the P-value matrix using the dynamic programming 
+    algorithm presented in Staden, 1994.
+    
+    The P-value matrix is required to assign a P-value in constant time 
+    to each log-likelihood score for the motif occurrence candidates
+        
+    Parameters
+    ----------
+    motif : Motif 
+        motif object
+        
+    Returns
+    -------
+    numpy.array
+        P-value matrix
     """
 
+    errmsg: str
     if not motif.getIsScaled():
         errmsg = "\n\nERROR: the motif has no scaled score matrix. Cannot compute the p-value matrix"
         raise ScaledScoreMatrixException(errmsg)
@@ -379,7 +588,8 @@ cdef ccomp_pval_mat(motif):
         raise NoDataFrameException(errmsg)
 
     if motif.getMotif_scoreMatrix().empty:
-        raise NotValidMotifMatrixException("\n\nERROR: the given motif matrix is empty")
+        errmsg = "\n\nERROR: the given motif matrix is empty"
+        raise NotValidMotifMatrixException(errmsg)
 
     cdef int width
     cdef double bg
@@ -401,12 +611,12 @@ cdef ccomp_pval_mat(motif):
             if pos == 0:
                 pval_mat[0, score_matrix.loc[nuc, pos]] += np.double(1 * bg)
             else:
-                idxs = np.where(pval_mat[pos - 1, :] > 0)[0]
+                idxs = np.where(pval_mat[pos-1, :] > 0)[0]
 
                 for idx in idxs:
                     if pval_mat[pos-1, idx] != 0:
                         source = pval_mat[pos-1, idx]
-                        pval_mat[pos, score_matrix.loc[nuc, pos] + idx] += source*bg
+                        pval_mat[pos, score_matrix.loc[nuc, pos] + idx] += source * bg
                     # end if
                 # end for
             # end if
@@ -420,8 +630,25 @@ cdef ccomp_pval_mat(motif):
 # end of ccomp_pval_mat()
 
 
-def comp_pval_mat(motif):
-    """ Python call function """
+def comp_pval_mat(motif: Motif) -> np.array:
+    """Python wrapper for comp_pval_mat() function 
+    
+    Computes the P-value matrix using the dynamic programming 
+    algorithm presented in Staden, 1994.
+    
+    The P-value matrix is required to assign a P-value in constant time 
+    to each log-likelihood score for the motif occurrence candidates
+        
+    Parameters
+    ----------
+    motif : Motif 
+        motif object
+        
+    Returns
+    -------
+    numpy.array
+        P-value matrix
+    """
 
     return ccomp_pval_mat(motif)
 

@@ -1,50 +1,41 @@
-"""
+"""Functions and constant variables used in GRAFIMO code"""
 
-@author: Manuel Tognon
 
-@email: manu.tognon@gmail.com
-@email: manuel.tognon@studenti.univr.it
-
-Auxiliary functions used during the different steps of
-GRAFIMO workflow
-
-"""
-
-import sys
-from shutil import which
-import numpy as np
-import pandas as pd
 from grafimo.GRAFIMOException import NoDataFrameException
+from typing import List, Optional, Tuple
+from shutil import which
+import pandas as pd
+import numpy as np
+import sys
+import os
 
-"""
-    definition of constant variables
-"""
 
-DNA_ALPHABET = ['A', 'C', 'G', 'T']  # dna alphabet (we ignore the N and the IUPAC symbols)
+#-----------------------------------------------------------------------
+# constant vars
+#-----------------------------------------------------------------------
+DNA_ALPHABET = ['A', 'C', 'G', 'T'] 
 REV_COMPL = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
 PSEUDObg = np.double(0.0000005)
 LOG_FACTOR = 1.44269504
 RANGE = 1000
 CHROMS_LIST = [str(i) for i in range(1, 23)] + ['X', 'Y']
+DEFAULT_OUTDIR = "default_out_dir_name"
 EXT_DEPS = ['tabix', 'vg', 'dot']
 SOURCE = 'grafimo'
 TP = 'nucleotide_motif'
 PHASE = '.'
 
-"""
-    functions from utils.py
-"""
 
+#-----------------------------------------------------------------------
+# functions
+#-----------------------------------------------------------------------
+def die(code: int) -> None:
+    """Stop the execution and exit.
 
-def die(code):
-    """
-        Exit from the execution
-        ----
-        Parameters:
-            code (int) : exit code
-        ----
-        Returns:
-             None
+    Parameters
+    ----------
+    code : int
+        stop code
     """
 
     sys.exit(code)
@@ -52,27 +43,31 @@ def die(code):
 # end of die()
 
 
-def sigint_handler():
+def sigint_handler() -> None:
+    """Print a message when a SIGINT is caught and exit."""
 
     print("\nCaught SIGINT. GRAFIMO will exit")
     die(2)
+
 # end of sigint_handler()
 
 
-def isListEqual(lst1,
-                lst2):
-    """
-        Compare two lists if they are equal
-        ----
-        Parameters:
-            lst1 (list) : first list
-            lst2 (list) : second list
-        ----
-        Returns:
-            (bool)
+def isListEqual(lst1: List, lst2: List) -> bool:
+    """Check if two lists contain the same distinct elements.
+
+    Parameters
+    ----------
+    lst1 : list
+        list 1
+    lst2 : list
+        list 2
+    
+    Returns
+    -------
+    bool
     """
 
-    if len(lst1) == len(lst2) and set(lst1) == set(lst2):
+    if (len(lst1) == len(lst2) and set(lst1) == set(lst2)):
         return True
 
     return False
@@ -80,18 +75,18 @@ def isListEqual(lst1,
 # end of isListEqual()
 
 
-def initialize_chroms_list(args_chroms):
-    """
-        Initialize the list of chromosomes that will be
-        considered by GRAFIMO, during its run.
-        ----
-        Parameters:
-            args_chroms (list) : chromosome list as it is obtained
-                                    from the user input
-            chroms_lst (list) : list of all the chromosome
-        ----
-        Returns:
+def initialize_chroms_list(args_chroms: List[str]):
+    """Initialize a list of chromomsome to use during GRAFIMO analysis.
 
+    Parameters
+    ----------
+    args_chroms : list
+        list of user chromosomes
+    
+    Returns
+    -------
+    list
+        chromosome list
     """
 
     if not args_chroms:
@@ -105,24 +100,20 @@ def initialize_chroms_list(args_chroms):
 # end of initialize_chroms_list()
 
 
-def check_deps():
-    """
-        Checks if all external dependencies needed by
-        GRAFIMO (vg and tabix) are satisfied
-        ----
-        Parameters:
-            None
-        ----
-        Returns:
-            sat (bool) : set to False if at least one
-                            dependency is not satisfied
-            deps_not_sats (list) : list containing the
-                                    dependencies that are
-                                    not satisfied
+def check_deps() -> Tuple[bool, List[str]]:
+    """Check if the external dependencies needed to run GRAFIMO are 
+    satisfied.
+
+    Returns
+    -------
+    bool
+        check result
+    list
+        list of dependencies not satisfied
     """
 
-    deps_not_sats = []
-    sat = True
+    deps_not_sats: List[str] = list()
+    sat: bool = True
 
     for dep in EXT_DEPS:
         if not which(dep) is not None:
@@ -131,21 +122,29 @@ def check_deps():
 
     return sat, deps_not_sats
 
-# end of check_deps
+# end of check_deps()
 
-def isJaspar_ff(motif_file):
+
+def isJaspar_ff(motif_file: str) -> bool:
+    """Check if the given motif file is a JASPAR file
+        
+    Parameters
+    ----------
+    motif_file : str 
+        motif file
+        
+    Returns
+    -------
+    bool
+        check result
     """
-        Check if a file is in .jaspar format
-        ----
-        Parameters:
-            motif_file (str) : path to the motif file
-        ----
-        Returns:
-            (bool)
-    """
+
+    if not os.path.isfile(motif_file):
+        errmsg: str = "\n\nERROR: unable to find %s" % motif_file
+        raise FileNotFoundError(errmsg)
 
     if motif_file and isinstance(motif_file, str):
-        ff = motif_file.split('.')[-1]
+        ff: str = motif_file.split('.')[-1]
 
         if ff == 'jaspar':
             return True
@@ -153,22 +152,31 @@ def isJaspar_ff(motif_file):
             return False
 
     else:
-        return False  # the motif file was not given as a path or the path is of length 0
+        return False
+
+# end of isJaspar_ff()
 
 
-def isMEME_ff(motif_file):
+def isMEME_ff(motif_file: str) -> bool:
+    """Check if the given motif file is a MEME file
+        
+    Parameters
+    ----------
+    motif_file : str 
+        motif file
+        
+    Returns
+    -------
+    bool
+        check result
     """
-        Check if the given file is in .meme format
-        ----
-        Parameters:
-            motif_file (str) : path to the motif file
-        ----
-        Returns:
-            (bool)
-    """
+
+    if not os.path.isfile(motif_file):
+        errmsg: str = "\n\nERROR: unable to find %s" % motif_file
+        raise FileNotFoundError(errmsg)
 
     if motif_file and isinstance(motif_file, str):
-        ff = motif_file.split('.')[-1]
+        ff: str = motif_file.split('.')[-1]
 
         if ff == 'meme':
             return True
@@ -176,73 +184,80 @@ def isMEME_ff(motif_file):
             return False
 
     else:
-        return False  # the motif file was not given or the path is empty
+        return False 
+
+# end of isMEME_ff()
 
 
-def almost_equal(value1,
-                 value2,
-                 slope):
+def almost_equal(value1: np.double,
+                 value2: np.double,
+                 slope: np.double
+) -> bool:
+    """Check if two values are 'close' to each other. given a degree
+    of tolerance
+    
+    Parameters
+    ----------
+    value1 : np.double
+        first value
+    value2 : np.double 
+        second value
+    slope : np.double
+        tolerance
+        
+    Returns
+    -------
+    bool
     """
-        Computes if two values are close considering a slope as degree
-        of freedom
-        ----
-        Parameters:
-            value1 (np.double) : first value
-            value2 (np.double) : second value
-            slope (np.double) : tolerance
-        ----
-        Returns:
-             (bool)
-    """
 
-    if (value1 - slope) > value2 or (value1 + slope) < value2:
+    if ((value1 - slope) > value2 or (value1 + slope) < value2):
         return False
-    else:
-        return True
+    
+    return True
+
+# end of almost_equal()
 
 
-def lg2(value):
+def lg2(value: np.double) -> np.double:
+    """C like computation of log2
+        
+    Parameters
+    ----------
+    value : np.double 
+        value
+        
+    Returns
+    np.double
+        log2 of the input value
     """
-        C-like implementation of the log2 with a faster running time
-        ----
-        Parameters:
-            value (np.double) : value of which the log2 will be computed
-        ----
-        Returns:
-            (np.double)
-    """
 
-    return (np.log(value) * LOG_FACTOR)
+    log2value = (np.log(value) * LOG_FACTOR)
+    return log2value
+
+# end of lg2()
 
 
-def correct_path(path, path_id='', file_format=''):
-    if path[-1:] == '/':
-        new_path = ''.join([path, path_id, file_format])
-    else:
-        new_path = ''.join([path, '/', path_id, file_format])
+def unique_lst(lst: List, size: Optional[int] = None) -> List:
+    """Get the unique values contained in a list and store them in 
+    another one.
 
-    return new_path
+    Parameters
+    ----------
+    lst : list
+        list of values
+    size : int, optional
+        number of unique values that the list has to contain
 
-
-def unique_lst(lst,
-               size=None):
-    """
-        Get the unique values inside a list
-        ----
-        Parameters:
-            lst (list) : list of values
-            size (int) : number of unique elements the list must contain.
-                         By default it is set to None, then all the element
-                         of the list will be checked.
-        ----
-        Returns:
-            unique_lst (list) : list of the unique values in lst
+    Returns
+    -------
+    list
+        list of the unique values
     """
 
     assert (len(lst) > 0)
 
-    unique_lst = []
-    el_num = 0
+    unique_lst: List = list() 
+    el_num: int = 0
 
     for el in lst:
 
@@ -257,50 +272,57 @@ def unique_lst(lst,
 
     return unique_lst
 
+# end of unique_lst()
 
-def list_data(data,
-              qvalue):
+
+def list_data(data: pd.DataFrame, qvalue: bool) -> List:
+    """Convert a pandas DataFrame in a list containign each dataframe 
+    column as a list of values
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        input DataFrame
+    qvalue : bool
+        if True the column of q-values has to be considered
+
+    Returns
+    -------
+    list
+        list containing DataFrame's columns as list of values
     """
-        Convert a pandas DataFrame in a list of lists, where
-        each column is a list of values
-        ----
-        Parameters:
-            data (pd.DataFrame) : input pandas DataFrame
-        ----
-        Returns:
-            summary (list) : pandas DataFrame converted in a
-                                list of lists
-    """
+
 
     if not isinstance(data, pd.DataFrame):
-        raise NoDataFrameException("DataFrame given is not an instance of pandas.DataFrame")
-        die(1)
+        errmsg: str = "\n\nERROR: not allowed data type given"
+        raise NoDataFrameException(errmsg)
 
-    assert len(data.columns) <= 11
-    assert len(data.columns) >= 10
+    assert len(data.columns) <= 12
+    assert len(data.columns) >= 11
 
-    seqnames = data['sequence_name'].to_list()
-    starts = data['start'].to_list()
-    stops = data['stop'].to_list()
-    scores = data['score'].to_list()
-    strands = data['strand'].to_list()
-    motifIDs = data['motif_id'].to_list()
-    motifNames = data['motif_alt_id'].to_list()
-    pvalues = data['p-value'].to_list()
-    sequences = data['matched_sequence'].to_list()
-    references = data['reference'].to_list()
+    seqnames: List[str] = data['sequence_name'].to_list()
+    starts: List[int] = data['start'].to_list()
+    stops: List[int] = data['stop'].to_list()
+    scores: List[np.double] = data['score'].to_list()
+    strands: List[str] = data['strand'].to_list()
+    motifIDs: List[str] = data['motif_id'].to_list()
+    motifNames: List[str] = data['motif_alt_id'].to_list()
+    pvalues: List[np.double] = data['p-value'].to_list()
+    sequences: List[str] = data['matched_sequence'].to_list()
+    frequencies:List[int] = data['haplotype_frequency'].to_list()
+    references: List[str] = data['reference'].to_list()
 
     if qvalue:
-        qvalues = data['q-value'].to_list()
+        qvalues: List[np.double] = data['q-value'].to_list()
 
     if qvalue:
         summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-                   pvalues, sequences, references, qvalues]
+                   pvalues, sequences, frequencies, references, qvalues]
     else:
         summary = [motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-                   pvalues, sequences, references]
+                   pvalues, sequences, frequencies, references]
 
-    summary_len = len(motifIDs)
+    summary_len: int = len(motifIDs)
 
     assert summary_len == len(data.index)
     assert summary_len == len(motifNames)
@@ -311,48 +333,62 @@ def list_data(data,
     assert summary_len == len(scores)
     assert summary_len == len(pvalues)
     assert summary_len == len(sequences)
+    assert summary_len == len(frequencies)
+    assert summary_len == len(references)
 
     if qvalue:
         assert summary_len == len(qvalues)
 
     return summary
 
+# end of list_data()
 
-def printProgressBar(iteration,
-                     total,
-                     prefix='',
-                     suffix='',
-                     decimals=1,
-                     length=50,
-                     fill='=',
-                     printEnd="\r"):
-    """
-        Print the progress bar in the sequence scoring process and graph extraction
-        process
-        ----
-        Parameters:
-            iteration (int) : fraction of work done
-            total (int) : total amount of work to do
-            prefix (str) : string to put in fornt of the bar
-            suffix (str) : string to put at the end of the bar
-            decimals (int) : number of digits after the dot, in the
-                                representation of the percentage of work done
-            length (int) : length of the bar
-            fill (str) : character with will be filled the bar
-            printEnd (str) : what will be done when the bar has been
-                                completely printed
-        ----
-        Returns:
-            None
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + ' ' * (length - filledLength)  # "allocate space" for the bar
 
-    # print the bar
+def printProgressBar(iteration: int,
+                     total: int,
+                     prefix: Optional[str] = '',
+                     suffix: Optional[str] = '',
+                     decimals: Optional[int] = 1,
+                     length: Optional[int] = 50,
+                     fill: Optional[str] = '=',
+                     printEnd: Optional[str] ="\r"
+) -> None:
+    """Print a progress bar.
+
+    The progress bar is printed while processing MEME files conatining 
+    many motifs, while building VGs, while extracting motif candidate 
+    and while scoring the motif candidates.
+
+    Parameters
+    ----------
+    iteration : int
+        iteration number
+    total : int
+        total number of iterations to do
+    prefix : str
+        string to print in front of the bar
+    suffix : str
+        string t print at the end of the bar
+    decimals : int
+        number of decmal digits to display
+    length : int
+        length of the bar (# characters to use)
+    fill : str
+        string to fill the bar
+    printEnd : str
+        string to print at end of the whole bar 'structure'
+    """
+
+    percent: str = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength: int = int(length * iteration // total)
+    # "allocate space" for the bar
+    bar: float = fill * filledLength + ' ' * (length - filledLength)  
+
     print('\r%s [%s] %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
 
     # new line when the bar is completely filled
     if iteration == total:
         print()
+
+# end of printProgressBar()
 
