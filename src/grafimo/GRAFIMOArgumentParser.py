@@ -55,7 +55,7 @@ class GRAFIMOArgumentParser(ArgumentParser):
         ) -> None:
         
             if usage is not SUPPRESS:
-                args: List = usage, actions, groups, ''
+                args = usage, actions, groups, ''
                 self._add_item(self._format_usage, args)
 
     # end of GRAFIMOHelpFormatter
