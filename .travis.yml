@@ -1,0 +1,24 @@
+language: python
+
+python: 
+  - "3.7"
+
+before_install: 
+  - chmod +x ./.travis/travis_before_install.sh
+  - ./.travis/travis_before_install.sh
+
+install:
+  - pip3 install Cython
+  - pip3 install setuptools
+  - pip3 install wheel
+  - pip3 install pandas 
+  - pip3 install numpy
+  - pip3 install statsmodels
+  - pip3 install sphinx
+  - pip3 install numba
+  - installationpath=$PWD
+  - echo $installationpath
+  - python3 setup.py install
+
+script:
+  - grafimo -h
