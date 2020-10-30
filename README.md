@@ -1,4 +1,6 @@
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/grafimo/README.html)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/platforms.svg)](https://anaconda.org/bioconda/grafimo)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/downloads.svg)](https://anaconda.org/bioconda/grafimo)
 
 # GRAFIMO
 GRAph-based Finding of Individual Motif Occurrences
