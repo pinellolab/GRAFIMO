@@ -1,12 +1,12 @@
 language: python
+sudo: required
+os: linux
+dist: bionic
+compiler: gcc
 
 python: 
   - "3.7"
-
-before_install: 
-  - chmod +x ./.travis/travis_before_install.sh
-  - ./.travis/travis_before_install.sh
-
+  
 install:
   - pip3 install Cython
   - pip3 install setuptools
@@ -19,6 +19,11 @@ install:
   - installationpath=$PWD
   - echo $installationpath
   - python3 setup.py install
+  - cd tests
+  - installationpath=$PWD
+  - echo $installationpath
 
 script:
   - grafimo -h
+  - grafimo --version
+  - grafimo --help
