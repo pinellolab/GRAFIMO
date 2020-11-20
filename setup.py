@@ -23,7 +23,7 @@ if sys.version_info[:2] < (3,6): # python 3.7 is required
 
 # read README file
 encoding_arg={'encoding': 'utf-8'} if sys.version_info[0] >= 3 else dict()
-readmefile = 'README'
+readmefile = 'README.md'
 with open(readmefile, **encoding_arg) as infile:
     long_description = infile.read()
 
