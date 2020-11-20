@@ -21,7 +21,7 @@ import os
 
 
 # version of GRAFIMO
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 
 def buildvg(args_obj: BuildVG) -> None:

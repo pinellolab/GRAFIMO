@@ -308,7 +308,7 @@ def score_seqs(sequences: List[str],
         # initialize lists where results will be stored
         seqs: List[str] = list()
         scores: List[np.double] = list()
-        pvalues: List[np.duble] = list()
+        pvalues: List[np.double] = list()
         seqnames: List[str] = list()
         chroms: List[str] = list()
         starts: List[int] = list()
@@ -318,6 +318,8 @@ def score_seqs(sequences: List[str],
         references: List[str] = list()
 
         seqs_scanned: int = 0  # counter for scanned sequences 
+
+        width: int = motif.getWidth()
 
         for s in sequences:
             with open(s, mode='r') as raw_sequences:
@@ -353,6 +355,12 @@ def score_seqs(sequences: List[str],
                             stops.append(stop)
                             strands.append(strand)
                             frequencies.append(freq)
+                            
+                            # fix indels reference report bug
+                            distance: int = np.abs(int(stop) - int(start))
+                            if (ref == "ref" and distance != width):
+                                ref = "non.ref"
+
                             references.append(ref)
                         # end if
 
@@ -380,6 +388,12 @@ def score_seqs(sequences: List[str],
                         stops.append(stop)
                         strands.append(strand)
                         frequencies.append(freq)
+
+                        # fix indels reference report bug
+                        distance: int = np.abs(int(stop) - int(start))
+                        if (ref == "ref" and distance != width):
+                            ref = "non.ref"
+
                         references.append(ref)
                     # end if
                 # end for

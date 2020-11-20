@@ -23,7 +23,7 @@ if sys.version_info[:2] < (3,6): # python 3.7 is required
 
 # read README file
 encoding_arg={'encoding': 'utf-8'} if sys.version_info[0] >= 3 else dict()
-readmefile = 'README.md'
+readmefile = 'README'
 with open(readmefile, **encoding_arg) as infile:
     long_description = infile.read()
 
@@ -72,13 +72,13 @@ class SDist(sd):
         super().run()
 
 name = "GRAFIMO"
-version = '1.1.1'
-release = version
+version = '1.1'
+release = '1.1.2'
 
 # definition of setup()
 setup(
       name='grafimo',
-      version=version,
+      version=release,
       author='Manuel Tognon',
       author_email='manu.tognon@gmail.com',
       url="https://github.com/pinellolab/GRAFIMO",
@@ -102,7 +102,7 @@ setup(
       install_requires=[
               'pandas>=0.24.2',
               'numpy>=1.16.4',
-              'statsmodels>=0.10.0',
+              'statsmodels>=0.11.0',
               'numba>=0.47',
               ],
       extras_require={
