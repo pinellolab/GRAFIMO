@@ -59,3 +59,6 @@ RUN pip3 install grafimo
 
 # check we have GRAFIMO, vg, tabix and graphviz available and in PATH
 RUN which grafimo && which vg && which tabix && which dot
+
+# Set expose to port 80 and 443
+EXPOSE 80 443
