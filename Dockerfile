@@ -1,6 +1,5 @@
 # Use the VG Docker image and build over it
-#FROM quay.io/vgteam/vg:v1.27.1
-FROM ubuntu:18.04 AS run
+FROM quay.io/vgteam/vg:v1.27.1
 
 # Update Ubuntu Software repository
 RUN apt-get update
@@ -8,30 +7,31 @@ RUN apt-get update
 # Upgrade Ubuntu Software repository
 RUN apt-get upgrade -y
 
-# Install wget and curl
-RUN apt-get install wget -y
+# make sure having gcc, make and git
+RUN apt-get install build-essential -y
+RUN apt-get install make -y
+RUN apt-get install sudo -y
+RUN apt-get install git -y
+
+# Install curl
 RUN apt-get install curl -y
 
-# Download vg binaries and set them available in PATH
-RUN mkdir /vg_dir
-RUN cd /vg_dir
-RUN wget https://github.com/vgteam/vg/releases/download/v1.27.1/vg
-RUN chmod +x ./vg
-RUN mv ./vg /usr/bin/
-RUN cd $HOME
+# Build VG from source (static binaries no more available)
+RUN sudo apt-get -y install build-essential git cmake pkg-config libncurses-dev libbz2-dev  \
+                     protobuf-compiler libprotoc-dev libprotobuf-dev libjansson-dev \
+                     automake libtool jq bc rs curl unzip redland-utils \
+                     librdf-dev bison flex gawk lzma-dev liblzma-dev liblz4-dev \
+                     libffi-dev libcairo-dev
 
 # Download and install python3.7
+WORKDIR /grafimo_wd
 RUN apt-get install python3.7 -y
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.7 50
 RUN apt-get install python3-distutils -y
-RUN apt-get install build-essential -y
 RUN apt-get install manpages-dev -y
 RUN apt-get install python-dev -y
 RUN apt-get install python3-dev -y
 RUN apt-get install libpython3.7-dev -y
-
-# Make sure to have git available
-RUN apt-get install git -y
 
 # Install GRAFIMO external dependencies
 RUN apt-get install tabix -y
@@ -57,5 +57,5 @@ RUN rm get-pip.py
 # Download and build GRAFIMO
 RUN pip3 install grafimo
 
-# Set expose to port 80 and 443
-EXPOSE 80 443
+# check we have GRAFIMO, vg, tabix and graphviz available and in PATH
+RUN which grafimo && which vg && which tabix && which dot
