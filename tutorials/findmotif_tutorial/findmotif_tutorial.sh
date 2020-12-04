@@ -96,5 +96,5 @@ grafimo findmotif -d data/mygenome -m $motif -b $bedfile --recomb -o grafimo_out
 grafimo findmotif -d data/mygenome -m $motif -b $bedfile -c x -o grafimo_out_chrx
 
 
-# See https://github.com/InfOmics/GRAFIMO/wiki for additional details
+# See https://github.com/pinellolab/GRAFIMO/wiki for additional details
 
