@@ -88,6 +88,5 @@ grafimo buildvg -l $reference -v $vcf -o vg_fresh_index --reindex
 # Their structure is identical to the original VGs
 
 
-
-# See https://github.com/InfOmics/GRAFIMO/wiki for additional details
+# See https://github.com/pinellolab/GRAFIMO/wiki for additional details
 
