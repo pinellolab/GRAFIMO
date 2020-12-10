@@ -6,186 +6,274 @@
 # GRAFIMO
 GRAph-based Finding of Individual Motif Occurrences
 
-![image](https://user-images.githubusercontent.com/51021763/80205317-b1535b80-862a-11ea-98bb-7e9680da7881.png)
+![image](./docs/wf.jpg)
 
-## Introduction
+Regulatory proteins, such as Transcription Factors (TFs), are key genomic elements which promote or reduce the expression of genes by binding short, evolutionary conserved DNA sequences, often referred to as motifs. Mutations occurring in DNA motifs have been shown to have deleterious effects on the transcriptional landscape of the cell (Li & Ovcharenko, 2015; Guo et al., 2018). The recent introduction of Genome Variation Graphs (VG) (Garrison et al., 2018) allowed to represent in a single and efficient data-structure the genomic variation present within a population of individuals.
 
-Transcription factors (TFs) are proteins that promote or reduce the expression of genes by binding nearby short DNA sequences known as transcription factor binding sites (TFBS). While several tools have been developed to report potential occurrences of TFBS in linear DNA sequences, no tool exists to find them in genome variation graphs (VGs). VGs are sequence-labeled graphs that can represent many genomes in a single compact data structure. Scanning for binding sites in VGs allows us to capture how genomic variation affects the binding landscape of a factor in a population of individuals.
+GRAFIMO (GRAph-based Finding of Individual Motif Occurrences) is a command-line tool that extends the traditional Position Weight Matrix (PWM) scanning procedure to VGs. GRAFIMO can search the occurrences of a given PWM in many genomes in a single run, accounting for the effects that SNPs, indels and potentially any structural variation (handled by VG) have on found potential motif occurrences. As result, GRAFIMO produces a report containing the statistically significant motif candidates found, reporting their frequency within the haplotypes embedded in the scanned VG and if they contain genomic variants or belong to the reference genome sequence.
 
-GRAFIMO is a command-line tool for the scanning of known TF DNA motifs represented as Position Weight Matrices (PWMs) in VGs. GRAFIMO implements features commonly available in motif scanning tools for linear genomes. Essentially, it extends the standard PWM scanning procedure to consider variation and alternative haplotypes encoded in a VG. Using GRAFIMO, we recover several binding sites that are missed when using only the reference genome, and which could constitute individual-specific binding events.
+## Installation
 
 
-## GRAFIMO installation
-**dependencies needed**
-- vg (v1.21.0 or later) (https://github.com/vgteam/vg). Note that vg must be in your PATH.
-- tabix (https://github.com/samtools/tabix)
-- graphviz (https://www.graphviz.org/)
+### Install dependencies
+GRAFIMO depends on a number of external tools and Python packages. Before installing GRAFIMO you should install
+- VG, v1.27.1 or later ([https://github.com/vgteam/vg](https://github.com/vgteam/vg))
+- Tabix ([https://github.com/samtools/htslib](https://github.com/samtools/htslib))
+- Graphviz ([https://www.graphviz.org/](https://www.graphviz.org/))
 
-**Building and installation**
+**Be sure that all are reachable in Unix PATH**.
 
-To build and install GRAFIMO follow the following steps:
+Note that is suggested to use samtools Tabix and not the one coming with VG. If the user is not sure about which tabix is running, he/she can type ```which tabix```, to retrieve which is the currently used Tabix.
+
+GRAFIMO is written in both Python3 and Cython. Thus, the user will need Cython to be installed to correctly build GRAFIMO. Cython can be obtained via pip
+```
+pip3 install Cython
+```
+
+To build GRAFIMO are used ```setuptools``` and ```wheel```. The user should make sure he/she has the latest version of both ```setuptools``` and ```wheel```
+```
+python3 -m pip install --user --upgrade setuptools wheel
+```
+
+GRAFIMO depends on a number of Python packages. If the dependencies are not satisfied, building GRAFIMO from source or via pip they should be automatically solved.
+
+To install all the required packages:
+```
+pip3 install pandas
+pip3 install numpy
+pip3 install statsmodels
+pip3 install sphinx
+pip3 install numba
+```
+
+### Build
+
+GRAFIMO can be built and installed via pip, from source code or via Bioconda. Note that the latter option is available only for Linux users.
+
+For further details on how to install GRAFIMO visit our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki).
+
+**Build and install via pip**
+
+To build and install GRAFIMO via pip
+```
+pip3 install grafimo
+```
+
+To test if GRAFIMO have been correctly installed
+```
+grafimo -h
+```
+
+If the help is correctly printed, then GRAFIMO have been installed and can be called from any location.
+
+**Build and install from source code**
+
+To build and install GRAFIMO from source code
+```
+git clone https://github.com/pinellolab/GRAFIMO.git 
+cd GRAFIMO
+python3 setup.py install --user
+```
+
+To quickly test GRAFIMO installation 
+```
+grafimo -h
+```
+
+If the help is correctly printed, then GRAFIMO have been installed and can be called from any location.
+
+It is also possible to test all the main functionalities of GRAFIMO using ```pytest``` ([https://docs.pytest.org/en/stable/](https://docs.pytest.org/en/stable/)).
+
+To install ```pytest```
+```
+pip3 install pytest
+```
+
+Once ```pytest``` have been installed, enter the ```tests``` directory and launch ```pytest```
+```
+cd tests
+pytest
+```
+
+If no test fails, then all GRAFIMO functionalities work properly.
+
+**Build and install via Bioconda (Linux users only)**
+
+To install GRAFIMO via Bioconda the user should first have the ```conda``` package installed. If the user have an Anaconda Python installation, ```conda``` is already available, otherwise it can be installed with [Miniconda](https://conda.io/en/latest/miniconda.html) package. For further details ([https://bioconda.github.io/user/install.html](https://bioconda.github.io/user/install.html)).
+
+Once ```conda``` is available, to install GRAFIMO
+```
+conda install grafimo
+```
+
+To update GRAFIMO
+```
+conda update grafimo
+```
+
+### Use GRAFIMO via Docker (All Operating Systems including MacOS and Windows)
+
+For MacOS and Windows users is suggested to run GRAFIMO via [Docker](https://www.docker.com/get-started). 
+
+The user can both pull an already built GRAFIMO docker image or build it from scratch. The user has also to ensure that Docker is currently installed and there are no too strict limits on the number of CPUs and quantity of memory that Docker can use ([https://docs.docker.com/config/containers/resource_constraints/](https://docs.docker.com/config/containers/resource_constraints/) for further details).  
+
+To pull the pre-built Docker image:
+```
+docker pull pinellolab/grafimo
+```
+To test the image is correctly running type:
+```
+docker run -i pinellolab/grafimo grafimo -h
+```
+If the help is correctly displayed, then the image has been correctly pulled.
+
+To build GRAFIMO Docker image from scratch, the user should clone or download GRAFIMO's github repository:
 ```
 git clone https://github.com/pinellolab/GRAFIMO.git
 cd GRAFIMO
-python3 setup.py install --user
-grafimo --help
 ```
-
-If the help is correctly shown, you have successfully built GRAFIMO.
-
-We successfully built GRAFIMO also using a Windows Subsystem for Linux.
-
-**Docker image**
-
-Note that docker must be installed in your machine:
-- https://docs.docker.com/docker-for-windows/install/ (Windows)
-- https://docs.docker.com/docker-for-mac/install/ (MacOS)
-
-There are two available ways to get GRAFIMO running on your machine using docker:
-- run the image from the Docker Hub
-- build the image by your own and run it
- 
-First option:
-
- make the pull of the image from the docker hub:
- ```
- docker pull pinellolab/grafimo
- docker run -it pinellolab/grafimo grafimo --help
- ```
-If the help is correctly printed, then the pull has been successfully completed and you should be able to run the image on your machine.
- 
-Second option:
- 
-clone GRAFIMO repository, enter it, build the docker image and run it by typing the following commands:
- ```
- git clone https://github.com/pinellolab/GRAFIMO.git
- cd GRAFIMO
- docker build -t grafimo .
- docker run -it grafimo grafimo --help
- ```
- If the help is correctly printed, then the image has been successfully built.
+and build the image:
+```
+docker build -t grafimo .
+```
+To test if the image has been correctly built, type:
+```
+docker run -i grafimo grafimo -h
+```
+If the help is correctly displayed, then the image has been correctly built.
 
 ## Usage
 
-GRAFIMO performs motif scanning on the VG genome variation-graph data-structure.  
-The given motifs are searched in the genomic coordinates specified in the input BED file.
+For hands-on tutorials on how to use GRAFIMO check out our [tutorials](https://github.com/pinellolab/GRAFIMO/tree/master/tutorials). 
 
-GRAFIMO scans a precomputed genome variation graph or a set of pre-computed genome graphs, e.g. one for each chromosome (suggested approach), for the occurrences of the given motif. It also allows the user to compute the VGs for each chromosome from scratch, given the reference FASTA file and a set of genomic variants in a VCF file.
+For further details on GRAFIMO usage refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki).
 
-The results are stored in three different file formats: TSV (can be viewed using Microsoft Excel or MacOS Numbers), HTML (can be viewed by any browser) and GFF (data can be loaded on UCSC genome browser).
-
-With GRAFIMO is also possible to compute the VG from your data (given a reference genome in FASTA format and a VCF file containing genomic variants). Will be created a set of genome variation graphs (one for each chromosome). This approach is equivalent to create a single whole genome variation graph, but allows a faster GRAFIMO analysis, in terms of running time. 
+### Searching potential motif occurrences with GRAFIMO
 
 **Input**
 
-The following three tables summarize the available input arguments for GRAFIMO.
-The first one shows the arguments to build the genome variation graph from your data. 
-The second table shows the arguments to scan a precomputed VG or a set of genome variation-graphs.
+GRAFIMO requires three mandatory arguments:
+- path to a directory containing the chromosomes VGs (XG and GBWT indexes) or path to the whole genome variation graph (XG and GBWT indexes). See [VG's wiki](https://github.com/vgteam/vg/wiki) for further details on XG and GBWT indexes.
+- path to PWM motif file in MEME or JASPAR format
+- BED file containing a set of genomic regions where GRAFIMO will search the motif occurrences
 
-*GRAFIMO building of genome variation graphs*
+**Searching motif**
 
-To build your genome variation graph with grafimo, as a set of VGs (one for each chromosome), type ```grafimo buildvg```, followed by the following arguments:
+The main functionalities of GRAFIMO is to perform a haplotype and variant-aware search of potential DNA motif occurrences in genome variation graph. 
 
-Options                   | Parameter      | Description                  | Default behavior 
---------------------------- | -------------- | ---------------------------- | ------------
-`-l` | `LINEAR-GENOME` | Path to the linear genome (the FA or FASTA formats are required) [mandatory] | No default 
-`-v` | `VCF`| Path to the VCF file that contains the variants the user wants to consider in the variation graph. The VCF must be compressed (e.g. VCF.vcf.gz) [mandatory] | No default
-`-c`| `1 2 X ...` | List of chromosomes for which the variation graph will be created | Is created the variation graph for all the chromosomes
-`--cores` | `NCORES` | Number of cores to use during VG construction | Takes all the available cores
+Here we assume that the genome variation graph (VG) has been built constructing a VG for each chromosome. If working with a single whole genome variation graph just substitute the argument ```-d``` with ```-g``` followed by the path to the whole genome VG. In the next section will be presented how to build a VG with GRAFIMO.
 
-*GRAFIMO scanning of pre-computed VG(s)*
+Note that in both cases the XG and GBWT indexes of the VG  must be stored in the same location.
 
-To scan a pre-computed VG (set of VGs) type ```grafimo findmotif```, followed by the following arguments:
+For further details refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki).
 
-Options                   | Parameter      | Description                  | Default behavior 
---------------------------- | -------------- | ---------------------------- | ------------
-`-g` | `GRAPH-GENOME` | Path to a pre-computed genome variation graph. It must be in XG or VG format. The former is preferred over the latter (**NB** this argument is an alternative to the `-d` option) [mandatory] | No default 
-`-d` | `GRAPH-GENOME-DIR`| Path to the directory that contains a set of VGs, on which the motif will be searched. Is assumed that has been constructed a VG for each chromosome (**NB** this is an alternative to `-g`option) [mandatory] | No default
-`-b` | `BEDFILE` | Path to the BED file containing a set genomic coordinates where the motif will be searched [mandatory] | No default
-`-m` | `MOTIF` | Path to the motif file motif to search on VG(s). Both MEME and JASPAR formats are allowed [mandatory] | No default
-`-h`|  | Print the help and exit | No default
-`--version`|  | Print GRAFIMO current version and exit | No default
-`--cores` | `NCORES` | Number of cores to use during GRAFIMO analysis | Takes all the available cores
-`-c`| `1 2 X ...` | List of chromosomes where the motif will be searched | The motif is searched on all the chromosomes
-`-k`| `BACKGROUND` | Path to a background file, which specifies the source of a 0-order background model to convert a probability matrix to a log-odds score matrix and to use in P-values estimation for corresponding scores. The guidelines to specify this file can be found at http://meme-suite.org/doc/bfile-format.html | Assume a uniform distribution for the background
-`-p`| `PSEUDOCOUNT` | Pseudocount that will be added to each motif count (probability), to avoid problems during log-odds matrix computation due to possible divisions by zero | 0.1
-`-t` | `THRESHOLD` | Hits with a P-value (by default) or a q-value higher than the defined threshold won't be returned in the results | 1e-4
-`-q`|  | If used the q-values will not be computed | q-values are computed
-`-r`|  | Only sequences belonging to the forward strand will be returned in the results | Are returned sequences belonging to both forward and reverse strands 
-`-f`|  | Print results on terminal, without creating the three results files | The results are summarized in three files stored in a newly created directory
-`-o`| `OUTDIR` | Name of the directory where the results will be stored | Is created a directory named `grafimo_out_JOBID_MOTIFNAME`
-`--qvalueT` |  | If used the threshold is apllied on q-values rather than on P-values | The threshold is applied on P-values
-`--top-graphs`| `GRAPHS_NUM` | For the first `GRAPHS_NUM` regions (ordered by P-value) containing an hit, will be returned their PNG image
-`--verbose`|  | Prints additional informations about GRAFIMO execution 
-
-**Output**
-
-GRAFIMO outputs the results of its analysis in three different file formats: TSV, HTML and GFF3. The three files are stored in the specified directory (`-o` option) or, by default, in a directory named `grafimo_out_JOBID_MOTIFNAME`.
-
-The three files will be named `grafimo_out.*`:
-- grafimo_out.tsv, TSV file containing the scored sequences; this file format can be easily viewed and managed with Microsoft Excel or MacOS Numbers
-- grafimo_out.html, HTML version of the TSV file; this file can be viewed using the browser you like most
-- grafimo_out.gff, a GFF3 file that allow the user to load the results on the UCSC genome browser as custom tracks
-
-## Advanced examples
-
-To take a deeper look into GRAFIMO functionalities enter the `test` directory by typing:
+If you are working in the ```tutorials/findmotif_tutorial``` directory, to run GRAFIMO
 ```
-cd GRAFIMO/test
+grafimo findmotif -d data/mygenome/ -m  data/example.meme -b data/regions.bed
 ```
 
-Let's start with an example showing how GRAFIMO creates a set of genome variation-graphs (one for each chromosome) from your data.
-
-Enter the directory `vg_creation`, by typing
-```
-cd vg_creation
-```
-
-First, we need a reference genome and a set of variants to create a genome variation-graph for each chromosome. Then, we need to download the genome FASTA file from the UCSC server by typing
-```
-wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-gunzip hg38.fa.gz  # uncompress the gz
-```
-and a VCF file containing SNPs and indel from the 1000 Genomes
-```
-wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz
-```
-
-To build your first genome variation graph (VG for each chromosome approach) with GRAFIMO, type
-```
-grafimo buildvg -l hg38.fa \
--v ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz 
-```
-GRAFIMO builds a variation graph for each chromosome enriched with the variants defined in the VCF given in input. If your analysis should be limited to a subset of chromosomes, just use the ```-c``` option. By default will be used all the cores available on your machine. To specify a custom number of cores, use the ```--cores```.
-All the previously described steps are summarized in the script ```vg_creation.sh```, available in `vg_creation` folder.
+By default GRAFIMO will create a directory in the current location called `grafimo_out_PID_MOTIFID`, containing the results. For further details on result files see **Results description** section.
 
 
-If you have a precomputed VG genome variation-graph or a set of VGs (e.g. one for each chromosome), you can follow the following steps.
+**Advanced options**
 
-To test this functionality of GRAFIMO go back to the ```test``` directory and enter ```vg_scan``` directory by typing 
-```
-cd ../vg_scan
-```
+***Using background distributions***
 
-First we copy the variation graphs obtained in the first part of the tutorial, in the current directory by typing
+For each potential motif occurrence GRAFIMO computes a log-likelihood score, a *P*-value and a *q*-value. Such measures are weighted by a background probability distribution. By default, GRAFIMO assumes a uniform background distribution for nucleotides. The user can specify a different background distribution in a text file and give it to GRAFIMO using `-k` option. An example of background file is
 ```
-cp ../vg_creation/chr*.xg .
-```
-Now, the variation graphs should be available in the current directory. 
-In ```vg_scan``` directory you'll find a file named `MA0139.1.meme`, which represents the PWM for CTCF, downloaded from JASPAR database (entry MA0139.1) a file named `ENCFF633TEW_2000.bed.zip` (you need to uncompress it before running GRAFIMO analysis), which represents 2000 genomic coordinates where CTCF motif will be searched, and an another file named `bg_nt`, which represents a background distribution for the genome (to define your own background file, refer to http://meme-suite.org/doc/bfile-format.html). Note that genomic coordinates defined in `ENCFF633TEW_2000.bed.zip` are ChIP-seq narrow peaks regions, available on the ENCODE project database; these coordinates were mapped on hg38 genome assembly and found on cell line K562.
-
-To run GRAFIMO analysis type in your terminal
-```
-grafimo findmotif -d ./ -b ENCFF633TEW_2000.bed -m MA0139.1.meme -k bg_nt
+A	0.2951
+C	0.2047
+T	0.2955
+G	0.2048
 ```
 
-GRAFIMO scans the variation-graphs in the specified directory (`-d` option) for CTCF motif occurrences in the regions defined in the given BED file. From these regions are obtained sequences of length 19, where 19 is the length of CTCF motif, with a sliding window approach, and each sequence is scored using the motif PWM given to GRAFIMO. Note that the search can be constrained to a subset of chromosomes, by using the `-c` option.
-The resulting scores are then filtered by P-value < 1e-4 (you can define your threshold and if it works on P-values or q-values). 
+For an example of background files accepted by GRAFIMO, take a look at [`bg_nt`](https://github.com/pinellolab/GRAFIMO/blob/master/tutorials/findmotif_tutorial/data/bg_nt) in `tutorials/findmotif_tutorial/data` directory.
 
-The output is a directory (named ```grafimo_out_JOBID_MA0139.1```) , containing the results, summarized in the files:
- - grafimo_out.tsv
- - grafimo_out.html
- - grafimo_out.gff
+If you are working in ```tutorials/findmotif_tutorial``` directory, to run GRAFIMO with a background distribution
+```
+grafimo findmotif -d data/mygenome/ -m data/example.meme -b data/regions.bed -k data/bg_nt 
+```
 
-All the previously described steps are summarized in the script ```vg_scan.sh```, available in `vg_scan` folder.
+***Setting thresholds on motif occurrences statistical significance***
+
+By default GRAFIMO applies a threshold of 1e-4 on the *P*-value of each retrieved potential motif occurrence. So, will be reported the motif candidates with an associated *P*-value smaller than 1e-4. The threshold can be changed by using the `-t` option. For example, let us set a threshold of 0.05 on the *P*-values.
+
+If you are working in ```tutorials/findmotif_tutorial``` directory, to run GRAFIMO applying a different threshold on *P*-values 
+```
+grafimo findmotif -d data/mygenome -m data/example.meme -b data/regions.bed -t 0.05
+```
+
+GRAFIMO, besides *P*-values, computes *q*-values for the motif occurrences candidates. The user can apply a threshold on *q*-values, rather than on *P*-values, by using the `--qvalueT` option. `--qvalueT` option can be used in combination with `-t` to define a threshold value different from 1e-4. Let us apply a threshold of 1e-4 on *q*-values.
+
+If you are working in ```tutorials/findmotif_tutorial``` directory, to run GRAFIMO applying a threshold on *q*-values
+```
+grafimo findmotif -d data/mygenome -m data/example.meme -b data/regions.bed --qvalueT -t 1e-4
+```
+
+**For more options**
+
+For more options refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki) or type
+```
+grafimo -h
+```
+
+**Results description**
+
+GRAFIMO results are reported in three files (stored in output directory):
+- tab-delimited report (TSV report)
+- HTML report
+- GFF3 report
+
+The TSV report contains all the statistically significant potential motif occurrence found by GRAFIMO (according to the applied threshold). Each retrieved motif occurrence has a log-likelihood score, a *P*-value, a *q*-value, its DNA sequence, a flag value stating if a sequence is part of the reference or has been found in the haplotypes and the number of haplotype sequences where the motif candidate sequence occurs. An example of TSV report is the following
+```
+	motif_id	motif_alt_id	sequence_name	start	stop	strand	score	p-value	q-value	matched_sequence	haplotype_frequency	reference
+1	MA0139.1	CTCF	chr22:43481590-43481860	43481733	43481714	-	21.26229508196724	4.403657357543095e-08	0.004175283686980911	AAGCCAGCAGGGGGCACAG	5096	ref
+2	MA0139.1	CTCF	chr22:19038291-19038561	19038422	19038441	+	19.245901639344254	1.9442011615088443e-07	0.005962538354344465	TGGCCAGCAAGGGGCACTG	4	non.ref
+3	MA0139.1	CTCF	chr22:19038291-19038561	19038422	19038441	+	19.114754098360663	2.1268826066771178e-07	0.005962538354344465	CGGCCAGCAAGGGGCACTG	5092	ref
+4	MA0139.1	CTCF	chr22:40856678-40856948	40856891	40856910	+	18.295081967213093	3.6764803446618004e-07	0.005962538354344465	TCCCCTCCAGGGGGCGACG	5096	ref
+5	MA0139.1	CTCF	chr22:11285607-11285877	11285804	11285785	-	18.213114754098342	3.8774723287177635e-07	0.005962538354344465	ATACCGCCAGGTGGCAGCA	5096	ref
+6	MA0139.1	CTCF	chr22:22125904-22126174	22126044	22126063	+	18.13114754098359	4.088625891963074e-07	0.005962538354344465	CAGCCTGCAGATGGCACAG	5096	ref
+7	MA0139.1	CTCF	chr22:20146797-20147067	20147010	20147029	+	17.688524590163922	5.4295945317287e-07	0.005962538354344465	CGGCCCGCAGGGGGCGGAT	5092	ref
+8	MA0139.1	CTCF	chr22:34842682-34842952	34842827	34842846	+	17.672131147540995	5.486120126825257e-07	0.005962538354344465	GAGCCAGTAGGGGACAGCG	146	non.ref
+9	MA0139.1	CTCF	chr22:42532903-42533173	42533062	42533081	+	17.622950819672155	5.659801842459994e-07	0.005962538354344465	GGGCCACCAGAGGGCTCCT	5096	ref
+10	MA0139.1	CTCF	chr22:34842682-34842952	34842827	34842846	+	17.44262295081967	6.331282484526275e-07	0.006002942174878742	GAGCCAGTAGGGGACAGTG	4950    ref
+```
+This report can be easily processed for a downstream analysis by using Python or R programming languages, for example.
+
+The HTML report has the same content of the TSV, but it can be loaded and viewed on the most commonly used web browsers.
+
+The GFF3 report can be loaded on the UCSC Genome Browser as a custom track. For example, this allows a fast linking between the genomic variants used to build the VG and those present in annotated databases like dbSNP or ClinVar.  
+
+### Building genome variation graphs (VGs) with GRAFIMO
+
+GRAFIMO allows also to build a genome variation graph from user data. To construct the VG are required 
+- a genome reference (in FASTA format)
+- VCF file containing the genomic variants to enrich the reference sequence.
+
+GRAFIMO builds the genome variation graph by constructing a VG for each chromosome. This allows a faster and more efficient motif search on the genome variation graph. 
+
+Note that this building choice is also suggested by VG developers.
+
+GRAFIMO will construct the XG and the GBWT index for each chromosome. The XG and GBWT indexes allow a faster and haplotype-aware motif search on VG. 
+
+Before attempting to build the VG  it is very important to make sure that the chromosome names in the VCF and in the reference FASTA sequence headers match. For example, if in the VCF the chromosome 1 is named `1`, the header of chromosome 1 sequence on the reference FASTA file should be `>1` and not `>chr1`.
+
+If you are in ```tutorials/buildvg_tutorial``` directory, to build a VG with GRAFIMO
+```
+grafimo buildvg -l data/xy.fa -v data/xy2.vcf.gz    
+```
+
+For further details refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki).
+
+## References 
+
+Li, Shan, and Ivan Ovcharenko. "Human enhancers are fragile and prone to deactivating mutations." *Molecular biology and evolution* 32.8 (2015): 2161-2180.
+
+Guo, Yu Amanda, et al. "Mutation hotspots at CTCF binding sites coupled to chromosomal instability in gastrointestinal cancers." *Nature communications* 9.1 (2018): 1-14.
+
+Garrison, Erik, et al. "Variation graph toolkit improves read mapping by representing genetic variation in the reference." *Nature biotechnology* 36.9 (2018): 875-879.
+
+## License
+
+MIT
 
