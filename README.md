@@ -35,7 +35,7 @@ To build GRAFIMO are used ```setuptools``` and ```wheel```. The user should make
 python3 -m pip install --user --upgrade setuptools wheel
 ```
 
-GRAFIMO depends on a number of Python packages. If the dependencies are not satisfied, building GRAFIMO from source or via pip they should be automatically solved.
+GRAFIMO depends on a number of Python packages. If the dependencies are not satisfied, by building GRAFIMO from source or via pip they should be automatically solved.
 
 To install all the required packages:
 ```
