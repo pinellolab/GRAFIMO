@@ -115,13 +115,13 @@ conda update grafimo
 
 For MacOS and Windows users is suggested to run GRAFIMO via [Docker](https://www.docker.com/get-started). 
 
-The user can both pull an already built GRAFIMO docker image or build it from scratch. The user has also to ensure that Docker is currently installed and there are no too strict limits on the number of CPUs and quantity of memory that Docker can use ([https://docs.docker.com/config/containers/resource_constraints/](https://docs.docker.com/config/containers/resource_constraints/) for further details).  
+The user can both pull an already built GRAFIMO docker image or build it from scratch. The user has also to ensure that Docker is currently installed and there are no too strict limits on the number of CPUs and amount of memory that Docker can use ([https://docs.docker.com/config/containers/resource_constraints/](https://docs.docker.com/config/containers/resource_constraints/) for further details).  
 
 To pull the pre-built Docker image:
 ```
 docker pull pinellolab/grafimo
 ```
-To test the image is correctly running type:
+To test if the image is correctly running, type:
 ```
 docker run -i pinellolab/grafimo grafimo -h
 ```
@@ -238,7 +238,7 @@ The TSV report contains all the statistically significant potential motif occurr
 9	MA0139.1	CTCF	chr22:42532903-42533173	42533062	42533081	+	17.622950819672155	5.659801842459994e-07	0.005962538354344465	GGGCCACCAGAGGGCTCCT	5096	ref
 10	MA0139.1	CTCF	chr22:34842682-34842952	34842827	34842846	+	17.44262295081967	6.331282484526275e-07	0.006002942174878742	GAGCCAGTAGGGGACAGTG	4950    ref
 ```
-This report can be easily processed for a downstream analysis by using Python or R programming languages, for example.
+This report can be easily processed for a downstream analysis.
 
 The HTML report has the same content of the TSV, but it can be loaded and viewed on the most commonly used web browsers.
 
@@ -252,11 +252,11 @@ GRAFIMO allows also to build a genome variation graph from user data. To constru
 
 GRAFIMO builds the genome variation graph by constructing a VG for each chromosome. This allows a faster and more efficient motif search on the genome variation graph. 
 
-Note that this building choice is also suggested by VG developers.
+Note that this genome variation graph building method is also suggested by VG developers.
 
 GRAFIMO will construct the XG and the GBWT index for each chromosome. The XG and GBWT indexes allow a faster and haplotype-aware motif search on VG. 
 
-Before attempting to build the VG  it is very important to make sure that the chromosome names in the VCF and in the reference FASTA sequence headers match. For example, if in the VCF the chromosome 1 is named `1`, the header of chromosome 1 sequence on the reference FASTA file should be `>1` and not `>chr1`.
+Before attempting to build the VG it is very important to make sure that the chromosome names in the VCF and in the reference FASTA sequence headers match. For example, if in the VCF the chromosome 1 is named `1`, the header of chromosome 1 sequence on the reference FASTA file should be `>1`, and not `>chr1`.
 
 If you are in ```tutorials/buildvg_tutorial``` directory, to build a VG with GRAFIMO
 ```
