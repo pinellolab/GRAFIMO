@@ -87,8 +87,8 @@ documentation.
 
 If you use GRAFIMO in your research, please cite us:
 
-    Tognon, M., et al., "GRAFIMO: variant-aware motif scanning via 
-    genome variation graphs", xxxx
+    Tognon, Manuel, et al. "GRAFIMO: variant and haplotype aware motif scanning on 
+    pangenome graphs." bioRxiv (2021).
 
 
 Run `grafimo --help` to see all command-line options.
