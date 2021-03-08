@@ -104,6 +104,7 @@ setup(
               'numpy>=1.16.4',
               'statsmodels>=0.11.0',
               'numba>=0.47',
+              'sphinx>=3.5.2',
               ],
       extras_require={
           'dev': ['Cython']
