@@ -81,15 +81,36 @@ class GRAFIMOArgumentParser(ArgumentParser):
         kwargs['usage'] = kwargs['usage'].replace("{version}", __version__)
         super().__init__(*args, **kwargs)
 
-
+    
     def error(
-        self, 
+        self,
         msg: str
     ) -> None:
         """Print the given message when argparse raise an error.
 
         At the bottom is also printed a new message telling the 
-        user how to call the halp
+        user how to call the help.
+
+        Parameters
+        ----------
+        msg : str
+            Message which will be shown when raising an error
+        """
+
+        errmsg = "{}: ERROR: {}.\n\nRun 'grafimo --help' to see usage\n\n"
+        sys.stderr.write(errmsg.format(self.prog, msg))
+        sys.exit(2)
+
+
+    def error_noargs(
+        self, 
+        msg: str
+    ) -> None:
+        """Print the given message when argparse raise an error.
+        
+        This error message s raised only when no arguments is given when
+        calling grafimo from command line. Prints the general help 
+        message.
 
         Parameters
         ----------
