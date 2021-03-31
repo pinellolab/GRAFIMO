@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2020 Pinello Lab
+# Copyright (c) 2021 Pinello Lab
 #
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the 
@@ -25,92 +25,83 @@
 
 
 """
-
 GRAFIMO version {version}
 
-Copyright (C) 2020 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@univr.it>
+Copyright (C) 2021 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@univr.it>
 
 GRAph-based Find of Individual Motif Occurrences.
 
 GRAFIMO scans genome variation graphs in VG format (Garrison et al., 2018) 
-for candidate binding site occurrences of a given DNA motif/ set of DNA 
-motifs. 
+to find potential binding site occurrences of DNA motif(s).
 
-This software requires that `Cython` (>= 0.28), `Pandas` (>= 0.24), 
-`Numpy` (>= 1.16), `Multiprocessing`, `Statsmodels` (>= 0.10) and 
-`Numba` (>= 0.47) to be installed within the Python3 enviroment you are 
-using while running it.
+Usage:
 
-This software also requires that `VG` (>= 1.27.1), `tabix` and `graphviz` 
-to be installed on your machine and have been added to your enviroment 
-PATH (Unix PATH). 
+    * to scan a set of precomputed genome variation graphs (-- SUGGESTED --):
 
-GRAFIMO searches the DNA motif(s) given as a PWM (MEME, JASPAR format) 
-in a set of genomic coordinates on the genome variation graph. These 
-genomic coordinates are given in UCSC BED file format.
+        grafimo findmotif -d path/to/my/vgs -b BEDFILE.bed -m MOTIF.meme [options]
 
-GRAFIMO scans in a single run many genomes, represented as genome 
-variation graphs, showing how genetic variation present within a 
-population of individuals affects the affinity score  of the given DNA 
+    * to scan a precomputed genome variation graph:
+        
+        grafimo findmotif -g GENOME_GRAPH.xg -b BEDFILE.bed -m MOTIF.meme [options]
+
+    * to build a new set of genome variation graphs (one for each chromosome or a user defined subset):
+        
+        grafimo buildvg -l REFERENCE.fa -v VCF.vcf.gz [options]
+
+GRAFIMO searches DNA motif(s) occurrences, given as a PWM (MEME, JASPAR format), 
+in a set of genomic coordinates on VGs. Genomic coordinates are provided in tab-separated file
+(e.g. ENCODE narrowPeak or UCSC BED format).
+
+GRAFIMO scans in a single run all the genomes encoded in the input VG. 
+GRAFIMO helps studying how genetic variation present within a 
+population of individuals affects the binding affinity score of input DNA 
 motif(s).
 
 GRAFIMO provides the possibility to build from user data a new genome 
 variation graph, by building a VG for each chromosome.
 
-GRAFIMO results are reported in three files stored in a result directory 
-(named `grafimo_out_JOBID` by default):
-* TSV report, containing all the reported binding site candidates, with 
-    an associated score, P-value, q-value, haplotype frequency within 
-    the analyzed population and a flag stating if the current occurrence 
-    contains a genomic variants
-* HTML version of the TSV report
-* GFF3 file to load the found motif candidates on the UCSC genome browser 
-  as custom track
+GRAFIMO results are reported in three files (stored in a directory named `grafimo_out_JOBID` by default):
+    
+    * TSV report, containing all the reported binding site candidates, with 
+      an associated score, P-value, q-value, haplotype frequency within 
+      the analyzed population and a flag stating if the current occurrence 
+      contains a genomic variants
 
-Usage:
+    * HTML version of the TSV report
 
-    * to scan a precomputed genome variation graph:
-        `grafimo findmotif -g GENOME_GRAPH.xg -b BEDFILE.bed -m MOTIF.meme [options]`
+    * GFF3 file to load the found motif candidates on the UCSC genome browser 
+      as custom track
 
-    * to scan a set of precomputed genome variation graphs 
-      (-- SUGGESTED --):
-        `grafimo findmotif -d path/to/my/vgs -b BEDFILE.bed -m MOTIF.meme [options]`
-
-    * to build a new set of genome variation graphs (one for each 
-      chromosome or a user defined subset):
-        `grafimo buildvg -l REFERENCE.fa -v VCF.vcf.gz [options]`
-
-See https://github.com/pinellolab/GRAFIMO or 
-https://github.com/InfOmics/GRAFIMO or the `docs` directory for the full 
-documentation.
-
-
-If you use GRAFIMO in your research, please cite us:
+Citation:
 
     Tognon, Manuel, et al. "GRAFIMO: variant and haplotype aware motif scanning on 
     pangenome graphs." bioRxiv (2021).
 
 
-Run `grafimo --help` to see all command-line options.
+Run "grafimo --help" to see all command-line options.
+See https://github.com/pinellolab/GRAFIMO/wiki or https://github.com/InfOmics/GRAFIMO/wiki for the full documentation.
 """
 
 
 from grafimo.GRAFIMOArgumentParser import GRAFIMOArgumentParser
 from grafimo.workflow import BuildVG, Findmotif
 from grafimo.utils import die, initialize_chroms_list, isJaspar_ff, isMEME_ff, \
-    check_deps, sigint_handler, EXT_DEPS, CHROMS_LIST, DEFAULT_OUTDIR
+    check_deps, sigint_handler, EXT_DEPS, CHROMS_LIST, DEFAULT_OUTDIR, NOMAP, ALL_CHROMS, anydup, exception_handler, UNIF, isbed
 from grafimo.grafimo import __version__, buildvg, findmotif
 from grafimo.GRAFIMOException import DependencyError
-import multiprocessing as mp
+
 from typing import List, Optional
+from glob import glob
+
+import multiprocessing as mp
+
 import argparse
-import glob
 import time
 import sys
 import os
 
 
-def get_AP() -> GRAFIMOArgumentParser:
+def get_parser() -> GRAFIMOArgumentParser:
     """Read the comman-line arguments given to GRAFIMO and creates a 
     GRAFIMOArgumentParser object containing all of them
 
@@ -128,117 +119,133 @@ def get_AP() -> GRAFIMOArgumentParser:
     parser: GRAFIMOArgumentParser = GRAFIMOArgumentParser(usage=__doc__, 
                                                           add_help = False)
 
-    ####################################################################
-    # start reading the arguments
-    ####################################################################
+    # start commandline arguments parsing
 
-    group = parser.add_argument_group("Options")
-    group.add_argument("-h", "--help", action="help", help="Show the help " 
-                       "message and exit")
-    group.add_argument("--version", action="version", help="Show the current "
+    # general options
+    group = parser.add_argument_group("General options")
+    group.add_argument("-h", "--help", action="help", help="Show this help " 
+                       "message and exit.")
+    group.add_argument("--version", action="version", help="Show software "
                        "version and exit", version=__version__)
-    group.add_argument("--cores", type=int, default=0, metavar="NCORES", 
-                       nargs='?', const=0, help="Number of cores to use. The "
-                       "default value is %(default)s (auto-detection). If you "
-                       "chose to query the whole genome variation graph note "
-                       "that the default option is to use only one core to avoid"
-                       " memory issues")
-
-    ####################################################################
-    # mandatory arguments
-    ####################################################################
-    group.add_argument("workflow", type=str, default='',
-                       help="This option accpets only two values: 'buildvg'"
-                       " or 'findmotif'. This option is mandatory. When used "
-                       "'buildvg', GRAFIMO will compute the genome variation "
-                       "graph for each chromosome or a user defined subset, "
-                       "from the given reference genome and VCF file. When used "
-                       "'findmotif' GRAFIMO will scan a given VG or all the VGs "
-                       "contained in a given directory, for the given motif "
-                       "occurrences")
-
-    # arguments to build the VGs
-    group.add_argument("-l", "--linear-genome", type=str, help="Path to the "
-                       "linear genome (FASTA format required)", nargs='?', 
-                       default='', metavar='LINEAR-GENOME', dest='linear_genome')
-    group.add_argument("-v", "--vcf", type=str, nargs='?', default='', 
-                       metavar='VCF', help="Path to the VCF file. The VCF must "
-                       "be compressed (e.g. myvcf.vcf.gz)")
-
-    # arguments to scan the VG/VGs
-    group.add_argument("-g", "--graph-genome", type=str, nargs='?', 
-                       metavar='GRAPH-GENOME', help="Path to the VG genome graph "
-                       "file (VG or XG format)", default='', dest='graph_genome')
-    group.add_argument("-d", "--graph-genome-dir", type=str, nargs='?', 
-                       metavar='GRAPH-GENOMES-DIR', help="Path to a directory "
-                       "containing a variable number of VGs graph genomes (VG "
-                       "or XG format)", default='', dest='graph_genome_dir')
-    group.add_argument("-b", "--bedfile", type=str, help="Path to the BED file "
-                       "containing the regions to scan", metavar='BEDFILE')
-    group.add_argument("-m", "--motif", type=str, nargs='+', metavar=('MOTIF1', 
-                       'MOTIF2'), help="Path to the motif file (JASPAR or MEME "
-                       "format required)")
-
-    ####################################################################
-    # optional arguments
-    ####################################################################
-    group.add_argument("-c", "--chroms", type=str, nargs='*',
-                       help="Chromosomes for which the VG will be built or in "
-                       "which GRAFIMO will search the given motif.\n To consider" 
-                       " all the chromosomes, just skip this argument.\n This "
-                       "argument can be used during the building of VGs or "
-                       "during their scan for the occurrences of the given "
-                       "motif", default=[], metavar=('1', 'X'))
-    group.add_argument("-k", "--bgfile", type=str, help="Path to the background "
-                       "file [optional]", nargs='?', const='', default='UNIF', 
-                       metavar='BACKGROUND')
-    group.add_argument("-p", "--pseudo", type=float, help="Pseudocount to add to" 
-                       " motif counts [optional]", nargs='?', const='0.1',
-                       default='0.1', metavar='PSEUDOCOUNT')
-    group.add_argument("-t", "--threshold", type=float, nargs='?', default=1e-4,
-                       metavar='THRESHOLD', const='1e-4', help="Threshold that "
-                       "will be applied on the P-values (by default) of each "
-                       "found motif occurrence. It is possible to apply the "
-                       "threshold on the q-values using the -q (--qvalueT) "
-                       "option.\n Default is 1e-4 [optional]")
-    group.add_argument("-q", "--no-qvalue", action='store_true', default=False, 
-                       dest='no_qvalue', help="With this parameter the q-values"
-                       " will not be computed")
-    group.add_argument("-r", "--no-reverse", default=False, action='store_true', 
-                       dest='no_reverse', help="With this parameter GRAFIMO will" 
-                       " scan only the forward strand")
-    group.add_argument("-f", "--text-only", default=False, action='store_true',
-                       dest='text_only', help="Print the results in TSV directly" 
-                       " to the standard output")
-    group.add_argument("-o", "--out", type=str, help="Name of the output directory"
-                       " [optional]", nargs='?', const='grafimo_out', default='', 
-                       metavar='OUTDIR')
-    group.add_argument("--recomb", action='store_true', default=False, 
-                       help="While scanning the genome variation graph for the "
-                       "given motif occurrences will be considered all possible "
-                       "recombinants that can be obtained with the genomic "
-                       "variants used to build the VG")
-    group.add_argument("--reindex", action='store_true', default=False, 
-                       help="When building the genome variation graph the VCF "
-                       "will be indexed with tabix, even if its TBI file it is "
-                       "already available. This option can only be used with "
-                       "the 'buildvg' pipeline")
-    group.add_argument("--qvalueT", action='store_true', default=False, 
-                       dest='qval_t', help="The threshold will be applied on "
-                       "the q-values, rather than the P-values")
-    group.add_argument("--top-graphs", type=int, help="The PNG image of the "
-                       "regions containing the top GRAPHS_NUM sequences (sorted "
-                       "by P-value) will be stored in the output directory",
-                       nargs='?', const=0, default=0, metavar='GRAPHS_NUM', 
-                       dest='top_graphs')
-
+    group.add_argument("-j", "--cores", type=int, default=0, metavar="NCORES", 
+                       nargs='?', const=0, help="Number of CPU cores to use. Use 0 "
+                       "to auto-detect. Default: %(default)s. "
+                       "To search motifs in a whole genome variation graph the "
+                       "default is 1 (avoid memory issues).")
     group.add_argument("--verbose", default=False, action='store_true',
-                       help="Output a lot of additional information about the "
-                       "execution")
+                       help="Print additional information about GRAFIMO run.")
+    group.add_argument("--debug", action="store_true", default=False, dest="debug",
+                       help="Enable error traceback.")
+    group.add_argument("-o", "--out", type=str, help="Output directory."
+                       " [optional]", nargs='?', const='grafimo_out', default="", 
+                       metavar='OUTDIR')
+    group.add_argument("workflow", type=str, default='',
+                       help="Mandatory argument placed immediately after \"grafimo\". "
+                       "Only two values are accepted: \"buildvg\" and \"findmotif\". "
+                       "When called \"grafimo buildvg\", the software will compute "
+                       "the genome variation graph from input data "
+                       "(see \"buildvg options\" section below for more arguments). "
+                       "When called \"grafimo findmotif\", the software will scan "
+                       "the input VG(s) for potential occurrences of the input "
+                       "motif(s) (see \"findmotif option\" section below for more arguments)."
+                       )
+
+    # buildvg options
+    group = parser.add_argument_group("Buildvg options")
+    group.add_argument("-l", "--linear-genome", type=str, nargs='?', 
+                       default='', metavar='REFERENCE-FASTA', dest='linear_genome',
+                       help="Path to reference genome FASTA file.")
+    group.add_argument("-v", "--vcf", type=str, nargs='?', default='', 
+                       metavar='VCF', help="Path to VCF file. Note that the VCF "
+                       "should be compressed (e.g. myvcf.vcf.gz).")
+    group.add_argument("--chroms-build", type=str, nargs="*", default=[], 
+                        metavar=("1", "X"), dest="chroms_build",
+                        help="Chromosomes for which construct the VG. By default "
+                        "GRAFIMO constructs the VG for all chromsomes.")
+    group.add_argument("--chroms-prefix-build", type=str, nargs="?", default="",
+                       metavar="CHRPREFIX", dest="chroms_prefix_build",
+                       help="Prefix to append in front of chromosome numbers. "
+                       "To name chromosome VGs with only their number (e.g. 1.xg), "
+                       "use \"--chroms-prefix-build \"\" \". Default: %(default)s.")
+    group.add_argument("--chroms-namemap-build", type=str, nargs="?", default="NOMAP",
+                      metavar="NAME-MAP-FILE", dest="chroms_namemap_build",
+                      help="Space or tab-separated file, containing original "
+                      "chromosome names in the first columns and the names to "
+                      "use when storing corresponding VGs. By default the VGs "
+                      "are named after the encoded chromosome (e.g. chr1.xg).")
+    group.add_argument("--reindex", action='store_true', default=False, 
+                       help="Reindex the VCF file with Tabix, even if a TBI "
+                       "index os already available.")
+
+    # findmotif options
+    group = parser.add_argument_group("Findmotif options")
+    group.add_argument("-g", "--genome-graph", type=str, nargs='?', 
+                       metavar='GENOME-GRAPH', default='', dest='graph_genome',
+                       help="Path to VG pangenome variation graph (VG or XG "
+                       "format).")
+    group.add_argument("-d", "--genome-graph-dir", type=str, nargs='?', 
+                       metavar='GENOME-GRAPHS-DIR', default='', 
+                       dest='graph_genome_dir', help="Path to the directory "
+                       "containing the pangenome variation graphs to scan (VG "
+                       "or XG format)")
+    group.add_argument("-b", "--bedfile", type=str, metavar='BEDFILE',
+                        help="BED file containing the genomic regions to scan "
+                        "for occurrences of the input motif(s).")
+    group.add_argument("-m", "--motif", type=str, nargs='+', metavar=('MOTIF1', 
+                       'MOTIF2'), help="Motif Position Weight Matrix (MEME or "
+                       "JASPAR format).")
+    group.add_argument("-k", "--bgfile", type=str, nargs='?', const='', 
+                       default=UNIF, metavar='BACKGROUND', help="Background "
+                       "distribution file.")
+    group.add_argument("-p", "--pseudo", type=float, nargs='?', const='0.1',
+                       default='0.1', metavar='PSEUDOCOUNT', help="Pseudocount "
+                       "used during motif PWM processing.")
+    group.add_argument("-t", "--threshold", type=float, nargs='?', default=1e-4,
+                       metavar='THRESHOLD', const='1e-4', help="Statistical "
+                       "significance threshold value. By default the threshold "
+                       "is applied on P-values. To apply the threshold on "
+                       "q-values use the \"--qvalueT\" options. Default:"
+                       "%(default)s.")
+    group.add_argument("-q", "--no-qvalue", action='store_true', default=False, 
+                       dest='no_qvalue', help="If used, GRAFIMO skips q-value "
+                       "computation.")
+    group.add_argument("-r", "--no-reverse", default=False, action='store_true', 
+                       dest='no_reverse', help="If used, GRAFIMO scans only the "
+                       "forward strand.")
+    group.add_argument("-f", "--text-only", default=False, action='store_true',
+                       dest='text_only', help="Print results to stdout.")
+    group.add_argument("--chroms-find", type=str, nargs="*", default=[],
+                       metavar=("1", "X"), dest="chroms_find", help="Scan only "
+                       "the specified chromosomes.")
+    group.add_argument("--chroms-prefix-find", type=str, nargs="?", default="",
+                       metavar="CHRPREFIX", dest="chroms_prefix_find", 
+                       help="Prefix shared by all chromosomes. The prefix should "
+                       "be followed by the chromosome number. If chromosome VGs "
+                       "are stored only with their chromosome number (e.g. 1.xg) "
+                       "use \"--chroms-prefix-fin \"\" \". Default: %(default)s.")
+    group.add_argument("--chroms-namemap-find", type=str, nargs="?", default="NOMAP",
+                       metavar="NAME-MAP-FILE", dest="chroms_namemap_find",
+                       help="Space or tab-separated file, containing original "
+                      "chromosome names in the first columns and the names used "
+                      "to store the corresponding VGs. By default GRAFIMO assumes "
+                      "that VGs are named after the encoded chromosome (e.g. chr1.xg).")
+    group.add_argument("--recomb", action='store_true', default=False, 
+                       help="Consider all the possible recombinants sequences "
+                       "which could be obtained from the genetic variants encoded "
+                       "in the VG. With this option the haplotypes encoded in "
+                       "the VG are ignored.")
+    group.add_argument("--qvalueT", action='store_true', default=False, 
+                       dest='qval_t', help="Apply motif occurrence score "
+                       "statistical significance threshold on q-values rather "
+                       "than on P-values.")
+    group.add_argument("--top-graphs", type=int, nargs='?', const=0, default=0, 
+                       metavar='GRAPHS-NUM', dest='top_graphs', help="Store the "
+                       "PNG image of the top \"GRAPHS-NUM\" regions of the VG "
+                       "(motif occurrences sorted by increasing P-value).")
 
     return parser
 
-# end of get_AP()
+# end of get_parser()
 
 
 def main(cmdLineargs: Optional[List[str]] = None) -> None :
@@ -248,15 +255,15 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
         start: float = time.time()
 
         # read the command-line arguments
-        parser: GRAFIMOArgumentParser = get_AP()
+        parser: GRAFIMOArgumentParser = get_parser()
 
         if cmdLineargs is None:
-            cmdLineargs: List[str] = sys.argv[1:]  # take input args
+            cmdLineargs: List[str] = sys.argv[1:]  # get input args
 
-        # no argument given
+        # no arguments given --> print help
         if len(cmdLineargs) == 0:
-            parser.error("No argument given. Unable to proceed.")
-            die(1)
+            parser.error_noargs()
+            die(2)
 
         # the second argument must be buildvg or findmotif
         if ((cmdLineargs[0] != "-h" and cmdLineargs[0] != "--help") and
@@ -272,425 +279,428 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
             print("Parsing arguments...")
             start_args_parse: float = time.time()
 
-        ################################################################
-        # check arguments consistency
-        ################################################################
+        #--------------------------------------------------------------#
+        # check commandline arguments consistency
+        #
 
+        #---------------------- general options -----------------------#
+        
+        # workflow type
         if args.workflow != "buildvg" and args.workflow != "findmotif":
-            parser.error("Do not know what to do. Available options: create VGs "
-                         "with 'grafimo buildvg' or scan a precomputed genome "
-                         "variation graph with 'grafimo findmotif'")
+            parser.error(
+                "Unexpected workflow given. Available options:\n"
+                "\tbuildvg: construct VG from user data.\n"
+                "\tfindmotif: scan VG for DNA motif(s) occurrences")
             die(1)
 
-        # cores (shared by the two workflows)
+        # cpu cores 
         if args.cores < 0:
-            parser.error("The number of cores cannot be negative")
-
+            parser.error("Negative number of CPU cores given")
         elif args.cores == 0 and args.graph_genome:
-            # to query a whole genome graph is loaded into RAM, since 
-            # usually they are very heavy in terms of bytes is safer to 
-            # use 1 thread by default, otherwise it would be loaded 
-            # #cores times. If you want use more cores, be sure your 
-            # system can handle the resulting amount of data
+            # when whole genome variation graph is given, it is safer to
+            # use 1 CPU core by default. This beacuse of the space needed
+            # to load the whole VG on RAM.
+            #
+            # CAVEAT: before requiring more CPU cores to be used, be sure
+            # your system has enough memory  
             args.cores = 1  
-
         elif args.cores == 0:
-            # by default take all the available CPUs
+            # default option -> use all available CPU cores
             args.cores = mp.cpu_count() 
-        # end if
+        else:  # args.cores > 0
+            if args.cores > mp.cpu_count():
+                parser.error(
+                    "Too many CPU cores to use ({})".format(args.cores)
+                )
 
-        # check verbose flag
+        # verbosity 
         if (not isinstance(args.verbose, bool) or
                 (args.verbose != False and args.verbose != True)):
             parser.error(
-                'The --verbose parameter accepts only True or False values')
+                '\"--verbose\" does not accept any positional argument'
+            )
 
-        # chromosomes check (shared by the two workflows)
-        if len(args.chroms) == 0:
-            args.chroms = ['ALL_CHROMS']
+        # debugging
+        if (not isinstance(args.debug, bool) or
+                (args.debug != False and args.debug != True)):
+            parser.error(
+                "\"--debug\" does not accept any positional argument"
+            )
 
-        buildvg_err_msg = "Invalid arguments for grafimo buildvg"
+        #---------------------- buildvg options -----------------------#
 
-        # checks for buildvg workflow
+        buildvg_err_msg: str = "Unexpected arguments for \"grafimo buildvg\": \"{}\""
+
         if args.workflow == "buildvg":
 
             if args.graph_genome_dir:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-d, --genome-graph-dir"))
                 die(1)
-
             elif args.graph_genome:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-g, --genome-graph"))
                 die(1)
-
             elif args.bedfile:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-b, --bedfile"))
                 die(1)
-
             elif args.motif:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-m, --motif"))
                 die(1)
-
-            elif args.bgfile != 'UNIF':  # if default ignored
-                parser.error(buildvg_err_msg)
+            elif args.bgfile != UNIF:  # if default ignored
+                parser.error(buildvg_err_msg.format("-k, --bgfile"))
                 die(1)
-
             elif args.pseudo != 0.1:  # if default ignored
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-p, --pseudo"))
                 die(1)
-
-            elif args.threshold != 1e-4:  # if default ignored"
-                parser.error(buildvg_err_msg)
+            elif args.threshold != 1e-4:  # if default ignored
+                parser.error(buildvg_err_msg.format("-t, --thresh"))
                 die(1)
-
             elif args.no_qvalue:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-q, --no-qvalue"))
                 die(1)
-
             elif args.no_reverse:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-r, --no-reverse"))
                 die(1)
-
             elif args.text_only:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("-f, --text-only"))
                 die(1)
-
+            elif args.chroms_find:
+                parser.error(buildvg_err_msg.format("--chroms-find"))
+                die(1)
+            elif args.chroms_prefix_find: 
+                parser.error(buildvg_err_msg.format("--chroms-prefix-find"))
+                die(1)
+            elif args.chroms_namemap_find != NOMAP:  # if default ignored
+                parser.error(buildvg_err_msg.format("--chroms-namemap-find"))
+                die(1)
             elif args.qval_t:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("--qvalueT"))
                 die(1)
-
             elif args.recomb:
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("--recomb"))
                 die(1)
-
             elif args.top_graphs != 0:  # if default ignored
-                parser.error(buildvg_err_msg)
+                parser.error(buildvg_err_msg.format("--top-graphs"))
                 die(1)
-
             elif not args.linear_genome:
                 parser.error("No reference genome given")
                 die(1)
-
             elif not args.vcf:
                 parser.error("No VCF file given")
                 die(1)
-
-            else:
-                # check linear genome
+            else:  # arguments for buildvg are correct
+                # reference genome
                 if (args.linear_genome.split('.')[-1] != 'fa' and
                         args.linear_genome.split('.')[-1] != 'fasta'):
                     parser.error(
-                        "The linear genome must be in FASTA format (FASTA and "
-                        "FA extensions allowed)")
+                        "The reference genome file must be in FASTA format"
+                    )
                     die(1)
-
                 else:
-                    if len(glob.glob(args.linear_genome)) != 1:
+                    if not os.path.isfile(args.linear_genome):
                         parser.error(
-                            'Cannot find the given reference genome file')
+                            "Unable to find {}".format(args.linear_genome)
+                        )
                         die(1)
-
+                    if os.stat(args.linear_genome).st_size == 0:  # empty file
+                        parser.error(
+                            "{} seems to be empty.".format(args.linear_genome)
+                        )
+                        die(1)
                     args.linear_genome = os.path.abspath(args.linear_genome)
-                # end if
-
-                # check VCF --> the VCF must have been compressed with
+                # VCF --> the VCF file must have been compressed with
                 # bgzip (https://github.com/samtools/tabix)
-                if ((args.vcf.split('.')[-1] != 'gz' 
-                        and args.vcf.split('.')[-1] != 'zip')
-                        or args.vcf.split('.')[-2] != 'vcf'):  
+                if (args.vcf.split(".")[-1] != "gz" and 
+                    args.vcf.split(".")[-2] != "vcf"):  
                     parser.error(
-                        "Incorrect VCF file given: the VCF must be compressed "
-                        "(e.g. myvcf.vcf.gz)")
+                        "Wrong VCF file given. The VCF file must have been "
+                        "compressed with bgzip (e.g. myvcf.vcf.gz)"
+                    )
                     die(1)
-
                 else:
-                    if len(glob.glob(args.vcf)) <= 0:
-                        parser.error('Cannot find the given VCF file')
+                    if not os.path.isfile(args.vcf):
+                        parser.error('Unable to find {}'.format(args.vcf))
+                        die(1)
+                    if os.stat(args.vcf).st_size == 0:  # empty file
+                        parser.error(
+                            "{} seems to be empty.".format(args.vcf)
+                        )
                         die(1)
                     args.vcf = os.path.abspath(args.vcf)
 
-                # by deafult the built VGs will be stored in the current 
-                # directory
-                if args.out == "":  # general default value
+                # chromosome to construct VG
+                if len(args.chroms_build) == 0:
+                    args.chroms_build = [ALL_CHROMS]  # use all chromosome 
+                else:
+                    if anydup(args.chroms_build):
+                        parser.error(
+                            "Duplicated chromosome names given to \"--chroms-build\""
+                        )
+
+                # chromosome name-map
+                if args.chroms_namemap_build != NOMAP:
+                    if not os.path.isfile(args.chroms_namemap_build):
+                        parser.error(
+                            "Unable to locate {}".format(args.chroms_namemap_build)
+                        )
+                if (args.chroms_prefix_build and args.chroms_namemap_build != NOMAP):
+                    parser.error(
+                        "\"--chroms-prefix-build\" and \"chroms-namemap-build\" "
+                        "cannot used together. Choose one of those options"
+                    )
+
+                # if no out directory is specified the VGs are stored in
+                # the current directory
+                if args.out == "": 
                     args.out = os.path.abspath("./")
 
                 workflow: BuildVG = BuildVG(args)
 
                 if args.verbose:
                     end_args_parse: float = time.time()
-                    print("Arguments parsed in %.2fs" % 
+                    print("Arguments parsed in %.2fs." % 
                           (end_args_parse - start_args_parse))
             # end if
         # end if
-
-        findmotif_err_msg = "Invalid arguments for grafimo findmotif"
         
-        # checks for findmotif workflow
+        #---------------------- findmotif options -----------------------#
+
+        findmotif_err_msg: str = "Unexpected arguments for \"grafimo findmotif\": \"{}\""
+
         if args.workflow == "findmotif":
             if args.linear_genome:
-                parser.error(findmotif_err_msg)
+                parser.error(findmotif_err_msg.format("-l, --linear-genome"))
                 die(1)
-
             elif args.vcf:
-                parser.error(findmotif_err_msg)
+                parser.error(findmotif_err_msg.format("-v, --vcf"))
                 die(1)
-
-            elif args.reindex:  # if default value is ignored
-                parser.error(findmotif_err_msg)
+            elif args.chroms_build:
+                parser.error(findmotif_err_msg.format("--chroms-build"))
+            elif args.chroms_prefix_build: 
+                parser.error(findmotif_err_msg.format("--chroms-prefix-build"))
+            elif args.chroms_namemap_build != NOMAP:
+                parser.error(findmotif_err_msg.format("--chroms-namemap-build"))
+            elif args.reindex:  # if default ignored
+                parser.error(findmotif_err_msg.format("--reindex"))
                 die(1)
-
             elif not args.graph_genome_dir and not args.graph_genome:
                 parser.error(
-                    "No genome variation graph or directory containing them given")
+                    "No arguments given for both \"--genome-graph\" and \"--genome-graph-dir\""
+                )
                 die(1)
-
             elif not args.bedfile:
                 parser.error("No BED file given")
                 die(1)
-
             elif not args.motif:
-                parser.error("No motif file (MEME of JASPAR format) given")
+                parser.error("No motif PWM given")
                 die(1)
-
             else:
-
-                # only one between graph_genome and graph_genome_dir 
-                # are allowed
+                # only one between graph_genome and graph_genome_dir is allowed
                 if args.graph_genome and args.graph_genome_dir:
-                    parser.error("Invalid arguments for grafimo buildvg")
+                    parser.error(
+                        "Only one argument between \"--genome-graph\" and \"--genome-graph-dir\""
+                        " can be used"
+                    )
                     die(1)
 
-                # check graph_genome
+                # genome graph
                 if args.graph_genome:
-                    if (args.graph_genome.split('.')[-1] != 'xg' and
-                            args.graph_genome.split('.')[-1] != 'vg'):
+                    if (args.graph_genome.split('.')[-1] != "xg" and
+                            args.graph_genome.split('.')[-1] != "vg"):
                         parser.error(
-                            "Cannot use the given genome variation graph (only "
-                            "VG or XG format allowed)")
+                            "Unrecognized genome variation graph format. Only"
+                            "VG and XG format are allowed"
+                        )
                         die(1)
-
                     elif not os.path.isfile(args.graph_genome):
                         parser.error(
-                            "Unable to find the given variation genome graph")
+                            "Unable to locate {}".format(args.graph_genome)
+                        )
                         die(1)
-
                     else:
-                        # it is safer to use absolute path to avoid bugs
-                        graph_genome: str = os.path.abspath(args.graph_genome)  
-                        args.graph_genome = graph_genome
-                    # end if
-                # end if
+                        # using absolute path avoid potential problems
+                        args.graph_genome = os.path.abspath(args.graph_genome)
 
-                # check graph_genome_dir
+                # genome graphs directory
                 if args.graph_genome_dir:
                     if not os.path.isdir(args.graph_genome_dir):
                         parser.error(
-                            "Cannot find the given directory containing the "
-                            "genome variation graphs")
+                            "Unable to locate {}".format(args.graph_genome_dir)
+                        )
                         die(1)
-
-                    if args.graph_genome_dir[-1] == '/':
-                        graph_genome_dir = args.graph_genome_dir
-
-                    else:
-                        graph_genome_dir = ''.join([args.graph_genome_dir, '/'])
-                    # end if
-
-                    if len(glob.glob(graph_genome_dir + '*.xg')) <= 0:
+                    if len(glob(os.path.join(args.graph_genome_dir, "*.xg"))) <= 0:
                         parser.error(
-                            ' '.join(['No XG genome variation graph found in', 
-                                      graph_genome_dir]))
+                            "No genome variation graph found in {}".format(args.graph_genome_dir)
+                        )
                         die(1)
-
                     else:
-                        graph_genome_dir: str = os.path.abspath(graph_genome_dir)
-                        args.graph_genome_dir = graph_genome_dir
-                    # end if
-                # end if
+                        # using absolute path avoid potential problems
+                        args.graph_genome_dir = os.path.abspath(args.graph_genome_dir)
 
-                # check BED file
+                # BED file
                 if args.bedfile:
-                    if args.bedfile.split('.')[-1] != 'bed':
-                        parser.error('Incorrect BED file given')
+                    if not isbed(args.bedfile, args.debug):
+                        parser.error(
+                            "The genomic coordinates must be given in UCSC BED files"
+                        )
                         die(1)
-
                     else:
-                        bedfile: str = args.bedfile
-
-                        if len(glob.glob(bedfile)) <= 0:
-                            parser.error('Cannot find the given BED file')
-                    # end if
-
+                        if not os.path.isfile(args.bedfile):
+                            parser.error(
+                                "Unable to locate {}".format(args.bedfile)
+                            )
                 else:
-                    parser.error('No BED file given')
-                # end if
+                    parser.error("No BED file given")
 
-                # check motif file
+                # motif pwm
                 if not args.motif:
-                    parser.error('No motif given')
+                    parser.error("No motif PWM given")
 
                 else:
                     motifs: List[str] = args.motif
-
-                    # check if the given motifs exist
                     for m in motifs:
-                        if not isMEME_ff(m) and not isJaspar_ff(m):
-                            parser.error("Unrecognized motif file format (only MEME or JASPAR allowed)")
+                        if not isMEME_ff(m, args.debug) and not isJaspar_ff(m, args.debug):
+                            parser.error(
+                                "Unrecognized motif PWM file format. "
+                                "{} does not follow the MEME or JASPAR format rules".format(m)
+                            )
                             die(1)
+                        if not os.path.isfile(m):
+                            parser.error("Unable to locate {}".format(m))
 
-                        if len(glob.glob(m)) <= 0:
-                            parser.error('Cannot find motif file: ' + m)
-                            die(1)
-                    # end for
-                # end if
+                # background file
+                if args.bgfile != UNIF:
+                    if not os.path.isfile(args.bgfile):
+                        parser.error("Unable to locate {}".format(args.bgfile))
 
-                # check background file
-                if args.bgfile != 'UNIF':
-                    bgfile: str = args.bgfile
-
-                    if len(glob.glob(bgfile)) <= 0:
-                        parser.error('Cannot find the given background file')
-                        die(1)
-                # end if
-
-                # check pseudocount
+                # pseudocount
                 if args.pseudo <= 0:
                     parser.error(
-                        'The pseudocount cannot be less than or equal 0')
+                        "Pseudocount values must be > 0, got {}".format(args.pseudo))
                     die(1)
 
-                # check threshold
+                # statistical significance threshold
                 if args.threshold <= 0 or args.threshold > 1:
-                    parser.error('The pvalue threshold must be between 0 and 1')
+                    parser.error(
+                        "Motif statistical significance threshold must be between 0 and 1")
                     die(1)
 
-                # check q-value flag
+                # q-value flag
                 if (not isinstance(args.no_qvalue, bool) or
                         (args.no_qvalue != False and args.no_qvalue != True)):
-                    parser.error(
-                        "The --qvalue parameter accepts only True or False as "
-                        "values")
+                    parser.error("\"--qvalue\" accepts only True or False values")
                     die(1)
 
-                # check no reverse flag
+                # no reverse flag
                 if (not isinstance(args.no_reverse, bool) or
                         (args.no_reverse != False and args.no_reverse != True)):
-                    parser.error(
-                        "The --no-reverse parameter accepts only True or False "
-                        "as values")
+                    parser.error("\"--no-reverse\" accepts only True or False values")
                     die(1)
 
-                # check text only flag
+                # text only flag
                 if (not isinstance(args.text_only, bool) or
                         (args.text_only != False and args.text_only != True)):
-                    parser.error(
-                        "The --text-only parameter accepts only True or False "
-                        "values")
+                    parser.error("\"--text-only\" accepts only True or False values")
                     die(1)
 
-                # check recombinant flag
+                # chromosome to consider during VG scan
+                if len(args.chroms_find) == 0:
+                    args.chroms_find = [ALL_CHROMS]  # use all chromosome 
+                else:
+                    if anydup(args.chroms_find):
+                        parser.error(
+                            "Duplicated chromosome names given to \"--chroms-find\""
+                        )
+
+                # chromosome name-map
+                if args.chroms_namemap_find != NOMAP:
+                    if not os.path.isfile(args.chroms_namemap_find):
+                        parser.error(
+                            "Unable to locate {}".format(args.chroms_namemap_find)
+                        )
+                if (args.chroms_prefix_find and args.chroms_namemap_find != NOMAP):
+                    parser.error(
+                        "\"--chroms-prefix-find\" and \"chroms-namemap-find\" "
+                        "cannot used together. Choose one of those options"
+                    )
+
+                # recomb flag
                 if (not isinstance(args.recomb, bool) or
                         (args.recomb != False and args.recomb != True)):
-                    parser.error(
-                        "The --recomb parameter accepts only True or False values")
+                    parser.error("\"--recomb\" accepts only True or False values")
                     die(1)
 
                 # out directory
-                if args.out == '':  # default option
+                if args.out == "":  # default option
                     args.out = DEFAULT_OUTDIR 
-                    
-                # check threshold on q-value flag
+                    print(args.out)
+
+                # threshold on q-value flag
                 if (not isinstance(args.qval_t, bool) or
                         (args.qval_t != False and args.qval_t != True)):
-                    parser.error
-                    ("The --qvalueT parameter accepts only True or False as values")
+                    parser.error("\"--qvalueT accepts only True or False values")
                     die(1)
-
                 elif args.no_qvalue == True and args.qval_t == True:
                     parser.error(
-                        "Cannot apply the threshold on q-values if you don't "
-                        "want them")
+                        "Unable to apply statistical significance threshold on"
+                        " q-values if you don't want them")
                     die(1)
 
-                # check the number of graph regions to store as PNG images
+                # number of graph regions to store as PNG images
                 if args.top_graphs < 0:
-                    parser.error(
-                        "The number of region graphs to show must be positive")
-
+                    parser.error("Negative number of regions to display")
+                
                 workflow: Findmotif = Findmotif(args)
 
                 if args.verbose:
                     end_args_parse: float = time.time()
-                    print("Arguments parsed in %.2fs" % 
+                    print("Arguments parsed in %.2fs." % 
                           (end_args_parse - start_args_parse))
-
             # end if
         # end if
 
-        # check that external dependencies are satisfied
+        # chck that external dependencies are satisfied
         if args.verbose:
-            print("Checking GRAFIMO external dependencies " + str(EXT_DEPS))
+            sys.stderr.write("Checking GRAFIMO external dependencies {}\n".format(EXT_DEPS))
             start_deps: float = time.time()
-
         satisfied: bool 
         deps_lack: List[str] 
-        
         satisfied, deps_lack = check_deps()
-
         if not satisfied and len(deps_lack) > 0:
-            raise DependencyError("\n\nERROR: The following dependencies are not" 
-                                  " sastisfied: " + str(deps_lack) +
-                                  "\nPlease, solve them before running GRAFIMO")
-
+            errmsg = "Some dependencies are not satisfied: {}.\nPlease solve them before running GRAFIMO.\n"
+            exception_handler(DependencyError, errmsg.format(deps_lack), args.debug)
         elif not satisfied and len(deps_lack) <= 0:
-            raise DependencyError("Some dependencies were found, but was not "
-                                  "possible to track them.\n" 
-                                  "Be sure they are available in system PATH")
-        # end if
+            errmsg = "Dependencies satisfied, but unable to recover them.\n Be sure they are in system PATH.\n"
+            exception_handler(DependencyError, errmsg, args.debug)
 
         if args.verbose and satisfied:
             end_deps: float = time.time()
-            print("Dependencies correctly satisfied")
-            print("Dependencies checked in %.2fs" % (end_deps - start_deps))
+            print("Dependencies satisfied.")
+            print("Dependencies checked in %.2fs." % (end_deps - start_deps))
 
-        ################################################################
-
+        #---------------------------------------------------------------
         # dependency check was ok, so we go to workflow selection:
-        #   * creation of the genome variation graph for 
+        #   * construction of the genome variation graph for 
         #     each chromosome or a user defined subset of them
         #   * scan of a precomputed VG or a set of precomputed VG
-
-        if isinstance(workflow, BuildVG):
-            # build the VG for each chromosome or a user defined subset 
-            # of them
-            buildvg(workflow)
-
-        elif isinstance(workflow, Findmotif):
-            # scan a precomputed VG or a set of VGs
-            findmotif(workflow)
-
+        if isinstance(workflow, BuildVG): buildvg(workflow, args.debug)
+        elif isinstance(workflow, Findmotif): findmotif(workflow, args.debug)
         else:
-            raise ValueError("Unknown arguments object type")
-        # end if
-
+            errmsg = "Expected BuildVG or Findmotif, got {}.\n"
+            exception_handler(TypeError, errmsg.format(type(workflow).__name__), args.debug)
+        
         end: float = time.time()  # GRAFIMO execution finishes here
-
-        print("Elapsed time %.2fs" % (end - start))
+        print("Elapsed time %.2fs." % (end - start))
 
     except KeyboardInterrupt:
         sigint_handler()
-
     finally:
         pass
-    # end try
-
 # end of main()
 
 
-########################################################################
-#
+#-----------------------------------------------------------------------
 # Entry point for GRAFIMO
 #
-########################################################################
 
 if __name__ == "__main__":
     main()

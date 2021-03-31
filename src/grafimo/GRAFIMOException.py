@@ -1,10 +1,10 @@
-"""Custom Exception redefinition for GRAFIMO.
+"""Custom Exceptions for GRAFIMO and exception hook handler definition.
 
-The base class GRAFIMOException, which inherits from Exception, is 
-then extended with custome exception fitting possible errors which can
-occurr while running GRAFIMO analysis
-
+The base class GRAFIMOException inherits from Exception. 
+GRAFIMOException is extended with custom exceptions, handling errors
+occurring during GRAFIMO run.
 """
+
 
 class GRAFIMOException(Exception):
     """Class to represent an excpetion which can occur ehile running 
@@ -12,7 +12,6 @@ class GRAFIMOException(Exception):
 
     It is the base for the other more specific GRAFIMO exceptions.
     """
-
     pass
 
 
@@ -20,10 +19,60 @@ class DependencyError(GRAFIMOException):
     """Raise if one of the external dependendencies needed by GRAFIMO 
     cannot be found.
     """
-
     pass
 
 
+class FileReadError(GRAFIMOException):
+    """Raise when errors occurred during generic file reading.
+    """
+    pass
+
+
+class FileWriteError(GRAFIMOException):
+    """Raise when errors occurred during generic file writing.
+    """
+    pass
+
+
+class FileFormatError(GRAFIMOException):
+    """Raise when errors occurred during generic file format checks.
+    """
+    pass
+
+
+class VGError(GRAFIMOException):
+    """Raise when errors occurred during calls to VG
+    """
+    pass
+
+
+class MotifFileFormatError(GRAFIMOException):
+    """Raise when motif PWM file format is not recognized by GRAFIMO.
+    """
+    pass
+
+
+class MotifFileReadError(GRAFIMOException):
+    """Raise when errors occurred during motif PWM file parsing.
+    """
+    pass
+
+
+class BGFileError(GRAFIMOException):
+    """Raise when errors occurred during background distribution file parsing or
+    during background distribution computation.
+    """
+    pass
+
+
+class MotifProcessingError(GRAFIMOException):
+    """Raise when errors occurred during motif position weight matrix processing
+    steps.
+    """ 
+    pass
+
+
+# ------------------------------------------------------------------------------
 class NoDataFrameException(GRAFIMOException):
     """Raise when a given object is not an instance of pandas.DataFrame
     type
@@ -64,12 +113,7 @@ class NotValidMotifMatrixException(GRAFIMOException):
     pass
 
 
-class NotValidBGException(GRAFIMOException):
-    """Raise when a not valid background distribution is given to the 
-    motif object
-    """
 
-    pass
 
 
 class NotValidAlphabetException(GRAFIMOException):
@@ -86,11 +130,7 @@ class NotValidFFException(GRAFIMOException):
     pass
 
 
-class FileReadingException(Exception):
-    """Raise if is not possible to read the current file
-    """
 
-    pass
 
 
 class ValueException(GRAFIMOException):
@@ -118,13 +158,6 @@ class WrongPathException(GRAFIMOException):
 class SubprocessError(GRAFIMOException):
     """Raise if a subprocess call returned an exit status different 
     from 0 (an error occurred)
-    """
-
-    pass
-
-
-class VGException(GRAFIMOException):
-    """Raise when errors occur while calling VG
     """
 
     pass

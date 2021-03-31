@@ -1,17 +1,18 @@
 """Motif object definition.
 
-The motif PWM in JASPAR or MEME format is represented by the motif class
-in GRAFIMO. In a single motif object can be accessed the corresponding
-probability matrices, scaled score matrices, P-value matrices, etc.
+A single Motif object stores important values, used during the following steps of 
+GRAFIMO's analysis, such as motif PSSM, p-value matrix, scaling factor, offset,
+motif information, etc.
 """
 
 
 from grafimo.GRAFIMOException import NotValidMotifMatrixException, \
     NoDataFrameException, WrongMotifIDException, WrongMotifWidthException, \
-    WrongMotifNameException, NotValidAlphabetException, ValueException, \
-    NotValidBGException
+    WrongMotifNameException, NotValidAlphabetException, ValueException
 from grafimo.utils import isListEqual, DNA_ALPHABET  
+
 from typing import List, Optional, Dict   
+
 import pandas as pd
 import numpy as np
 
@@ -39,7 +40,7 @@ class Motif(object):
 
     Attributes
     ----------
-    _count_matrix : pandas.DataFrame
+    _count_matrix : numpy.ndarray
         motif probability matrix
     _score_matrix : numpy.ndarray
         scaled motif scoring matrix
@@ -127,8 +128,8 @@ class Motif(object):
 
     #-------------------------------------------------------------------
     # Motif attributes
-    # ------------------------------------------------------------------
-    _count_matrix: pd.DataFrame  
+    # 
+    _count_matrix: np.ndarray  
     _score_matrix: np.ndarray
     _pval_matrix: np.array
     _min_val: np.double
@@ -136,6 +137,7 @@ class Motif(object):
     _scale: int
     _offset: np.double
     _bg: dict  
+    _nucsmap: dict
     _width: int
     _motif_id: str 
     _motif_name: str  
@@ -152,298 +154,354 @@ class Motif(object):
 
     #-------------------------------------------------------------------
     # Motif methods
-    # ------------------------------------------------------------------
-    def __init__(self,
-                 count_matrix: pd.DataFrame,
-                 width: int,
-                 alphabet: List[str],
-                 motif_id: str,
-                 motif_name: str
+    # 
+
+    # these errors should never appear --> no need for error formatting
+    # can assume that debug mode == True
+    def __init__(
+        self,
+        count_matrix: np.ndarray,
+        width: int,
+        alphabet: List[str],
+        motif_id: str,
+        motif_name: str,
+        nucsmap: dict
     ):
 
-        errmsg: str
-
-        if count_matrix.empty:
-            errmsg = "\n\nERROR: attempt to initialize the motif object with an "
-            errmsg += "empty count matrix"
+        if not isinstance(count_matrix, np.ndarray):
+            errmsg = "\n\nERROR: Expected numpy.ndarray, got {}.\n"
+            raise TypeError(errmsg.format(type(count_matrix).__name__))
+        if count_matrix.size == 0 or sum(sum(count_matrix)) == 0:
+            errmsg = "\n\nERROR: Empty motif count matrix.\n"
             raise NotValidMotifMatrixException(errmsg)
-
-        if not isinstance(count_matrix, pd.DataFrame):
-            errmsg = "\n\nERROR: the given value is not a pandas.DatFrame instance"
-            raise NoDataFrameException(errmsg)
-
-        if not isinstance(width, int) or width < 0:
-            errmsg = "\n\nERROR: attempt to initialize motif without a valid width"
-            raise WrongMotifWidthException(errmsg)
-
-        if not isinstance(motif_id, str) or not motif_id:
-            errmsg = "\n\nERROR: cannot initialize the motif with the given ID"
-            raise WrongMotifIDException(errmsg)
-
-        if not isinstance(motif_name, str) or not motif_name:
-            errmsg = "\n\nERROR: cannot initialize the motif with the given name"
-            raise WrongMotifNameException(errmsg)
-
-        if not isinstance(alphabet, list) or not isListEqual(alphabet, DNA_ALPHABET):
-            errmsg = "\n\nERROR: cannot initialize a motif object with a wrong alphabet"
-            raise NotValidAlphabetException(errmsg)
+        if not isinstance(width, int):
+            errmsg = "\n\nERROR: Expected int, got {}.\n"
+            raise TypeError(errmsg.format(type(width).__name__))
+        if width <= 0:
+            errmsg = "\n\nERROR: Forbidden motif width {}.\n"
+            raise ValueError(errmsg.format(width))
+        if not isinstance(motif_id, str):
+            errmsg = "\n\nERROR: Expected str, got {}.\n"
+            raise TypeError(errmsg.format(type(motif_id).__name__))
+        if not motif_id:
+            errmsg = "\n\nERROR: Not valid motif ID.\n"
+            raise ValueError(errmsg)
+        if not isinstance(motif_name, str):
+            errmsg = "\n\nERROR: Expected str, got {}.\n"
+            raise TypeError(errmsg.format(type(motif_name).__name__))
+        if not motif_name:
+            errmsg = "\n\nERROR: Not valid motif name.\n"
+            raise ValueError(errmsg)
+        if not isinstance(alphabet, list):
+            errmsg = "\n\nERROR: Expected list, got {}.\n"
+            raise TypeError(errmsg.format(type(alphabet).__name__))
+        if not isListEqual(alphabet, DNA_ALPHABET):
+            errmsg = "\n\nERROR: The motif is not built on DNA alphabet.\n"
+            raise ValueError(errmsg)
+        if not isinstance(nucsmap, dict):
+            errmsg = "\n\nERROR: Expected dict, got {}.\n"
+            raise TypeError(errmsg.format(type(nucsmap).__name__))
 
         self._count_matrix = count_matrix
         self._width = width
         self._motif_id = motif_id
         self._motif_name = motif_name
         self._alphabet = alphabet
+        self._nucsmap = nucsmap
 
 
-    def setMotif_matrix(self,
-                        motif_matrix: pd.DataFrame
-    ) -> None:
-
-        errmsg: str
-
-        if motif_matrix.empty:
-            errmsg = "\n\nERROR: attempt to use an empty motif matrix"
-            raise NotValidMotifMatrixException(errmsg)
-
+    def setMotif_matrix(self, motif_matrix: pd.DataFrame) -> None:
         if not isinstance(motif_matrix, pd.DataFrame):
-            errmsg = "\n\nERROR: the given value is not a pandas.DataFrame instance"
-            raise NoDataFrameException(errmsg)
-
+            errmsg = "\n\nERROR: Expected pandas.DataFrame, got {}.\n"
+            raise TypeError(errmsg.format(type(motif_matrix).__name__))
+        if motif_matrix.empty:
+            errmsg = "\n\nERROR: Empty motif matrix.\n"
+            raise ValueError(errmsg)
         self._count_matrix = motif_matrix
 
 
-    def setMotif_scoreMatrix(self,
-                             score_matrix: np.ndarray
-    ) -> None:
-    
-        errmsg: str
-        if (not isinstance(score_matrix, np.ndarray) and
-                not isinstance(score_matrix, pd.DataFrame)):
-            errmsg = "\n\nERROR: the given data-structure is not an instance of "
-            errmsg += "numpy.ndarray or pandas.DataFrame"
+    def set_motifScoreMatrix(self, score_matrix: np.ndarray) -> None:
+        if not isinstance(score_matrix, np.ndarray):
+            errmsg = "\n\nERROR: Expected numpy.ndarray, got {}.\n"
+            raise TypeError(errmsg.format(type(score_matrix).__name__))
+        if score_matrix.size == 0 or sum(sum(score_matrix)) == 0:
+            errmsg = "\n\nERROR: Empty motif score matrix.\n"
             raise ValueError(errmsg)
-
-        if isinstance(score_matrix, pd.DataFrame):
-            if score_matrix.empty:
-                errmsg = "\n\nERROR: attempt to use an empty score matrix"
-                raise NotValidMotifMatrixException(errmsg)
-
-        if isinstance(score_matrix, np.ndarray):
-            if score_matrix.size == 0:
-                errmsg = "\n\nERROR: attempt to use an empty score matrix"
-                raise NotValidMotifMatrixException(errmsg)
-
         self._score_matrix = score_matrix
 
 
-    def setMotif_pval_matrix(self,
-                             pval_mat: np.array
-    ) -> None:
-       
-        # empty or not valid p-value matrix
-        if len(pval_mat) == 0 or sum(pval_mat[:]) <= 0:
-            errmsg = "\n\nERROR: invalid p-value matrix"
-            raise NotValidMotifMatrixException(errmsg)
-
+    def set_motifPvalMatrix(self, pval_mat: np.array) -> None:
+        if not isinstance(pval_mat, np.ndarray):
+            errmsg = "\n\nERROR: Expected numpy.array, got {}.\n"
+            raise TypeError(errmsg.format(type(pval_mat).__name__))
+        if len(pval_mat) == 0:
+            errmsg = "\n\nERROR: Empty motif p-value matrix.\n"
+            raise ValueError(errmsg)
+        if sum(pval_mat) == 0:
+            errmsg = "\n\nERROR: Not valid motif p-value matrix.\n"
+            raise ValueError(errmsg)
         self._pval_matrix = pval_mat
 
 
-    def setMin_val(self,
-                   min_val: int
-    ) -> None:
-        
+    def set_minVal(self, min_val: int) -> None:
+        if not isinstance(min_val, int):
+            errmsg = "\n\nERROR: Expected int, got {}.\n"
+            raise TypeError(errmsg.format(type(min_val).__name__))
         if min_val <= -np.inf:
-            errmsg = ' '.join(["\n\nERROR: impossible to assign", min_val, 
-                               "to Motif.min_val"])
-            raise ValueException(errmsg)
-
+            errmsg = "\n\nERROR: Forbidden value {}.\n"
+            raise ValueError(errmsg.format(min_val))
         self._min_val = min_val
 
 
-    def setMax_val(self,
-                   max_val: int
-    ) -> None:
-
+    def set_maxVal(self, max_val: int) -> None:
+        if not isinstance(max_val, int):
+            errmsg = "\n\nERROR: Expected int, got {}.\n"
+            raise TypeError(errmsg.format(type(max_val).__name__))
         if max_val >= np.inf:
-            errmsg = ' '.join(["\n\nERROR: impossible to assign", max_val, 
-                               "to Motif.max_val"])
-            raise ValueException(errmsg)
-
+            errmsg = "\n\nERROR: Forbidden value {}.\n"
+            raise ValueError(errmsg.format(max_val))
         self._max_val = max_val
 
 
-    def setScale(self,
-                 scale: int
-    ) -> None:
-
+    def set_scale(self, scale: int) -> None:
         if not isinstance(scale, int):
-            raise ValueException("\n\nERROR: the scale factor must be an int")
-
-        assert scale > 0
-
+            errmsg = "\n\nERROR: Expected int, got {}.\n"
+            raise TypeError(errmsg.format(type(scale).__name__))
+        if scale <= 0:
+            errmsg = "\n\nERROR: Scaling factor must be positive integer number.\n"
+            raise ValueError(errmsg)
         self._scale = scale
 
 
-    def setOffset(self,
-                  offset: np.double
-    ) -> None:    
+    def set_offset(self, offset: np.double) -> None:  
+        if not isinstance(offset, np.double):
+            errmsg = "\n\nERROR: Expected numpy.double, got {}.\n"
+            raise TypeError(errmsg.format(type(offset).__name__))  
         self._offset = offset
 
 
-    def setBg(self,
-              bgs: Dict
-    ) -> None:
-        
+    def setBg(self, bgs: Dict) -> None:
         if not isinstance(bgs, dict):
-            errmsg = "\n\nERROR: the background values are not in a dictionary"
-            raise NotValidBGException(errmsg)
-
+            errmsg = "\n\nERROR: Expected dict, got {}.\n"
+            raise TypeError(errmsg.format(type(bgs).__name__))
         self._bg = bgs
 
 
-    def setWidth(self,
-                 width: int
-    ) -> None:
-        
-        if not isinstance(width, int) or width <= 0:
-            errmsg = "\n\nERROR: attempt to initialize motif without a valid width"
-            raise WrongMotifWidthException(errmsg)
-
+    def setWidth(self, width: int) -> None:
+        if not isinstance(width, int):
+            errmsg = "\n\nERROR: Expected int, got {}.\n"
+            raise TypeError(errmsg.format(type(width).__name__))
+        if width <= 0:
+            errmsg = "\n\nERROR: Not valid motif width.\n"
+            raise ValueError(errmsg)
         self._width = width
 
 
-    def setMotifID(self,
-                   motif_id: str
-    ) -> None:
-    
+    def setMotifID(self, motif_id: str) -> None:
         if not isinstance(motif_id, str):
-            errmsg = ' '.join(["\n\nERROR: cannot initialize the motif with the given ID:", 
-                               motif_id])
-            raise WrongMotifIDException(errmsg)
-
+            errmsg = "\n\nERROR: Expected str, got {}.\n"
+            raise TypeError(errmsg.format(motif_id).__name__)
         if not motif_id:
-            errmsg = "\n\nERROR: cannot use a motif with an empty ID"
-            raise WrongMotifIDException(errmsg)
-
+            errmsg = "\n\nERROR: Not valid motif ID.\n"
+            raise ValueError(errmsg)
         self._motif_id = motif_id
 
-    def setMotifName(self,
-                     motif_name
-    ) -> None:
-        
+    def setMotifName(self, motif_name) -> None:
         if not isinstance(motif_name, str):
-            errmsg = ' '.join(["Cannot initialize the motif with the given name:", 
-                               motif_name])
-            raise WrongMotifNameException(errmsg)
-
+            errmsg = "\n\nERROR: Expected str, got {}.\n"
+            raise TypeError(errmsg.format(type(motif_name).__name__))
         if not motif_name:
-            errmsg = "\n\nERROR: cannot use a motif with an empty name"
-            raise WrongMotifNameException(errmsg)
-
+            errmsg = "\n\nERROR: Not valid motif name.\n"
+            raise ValueError(errmsg)
         self._motif_name = motif_name
 
 
-    def setAlphabet(self,
-                    alphabet: List[str]
-    ) -> None:
-
+    def setAlphabet(self, alphabet: List[str]) -> None:
         if not isinstance(alphabet, list):
-            errmsg = "\n\nERROR: the given alphabet is not in a list"
-            raise NotValidAlphabetException(errmsg)
-
+            errmsg = "\n\nERROR: Expected list, got {}.\n"
+            raise TypeError(errmsg.format(type(alphabet).__name__))
+        if len(alphabet) == 0:
+            errmsg = "\n\nERROR: Empty motif alphabet.\n"
+            raise ValueError(errmsg)
         if not isListEqual(alphabet, DNA_ALPHABET):
-            errmsg = "\n\nERROR: the given alphabet is not a valid DNA alphabet"
-            raise NotValidAlphabetException(errmsg)
-
+            errmsg = "\n\nERROR: The motif is not built on DNA alphabet.\n"
+            raise ValueError(errmsg)
         self.alphabet = alphabet
 
 
-    def setIsScaled(self,
-                    isScaled: bool
-    ) -> None:
-        
-        if not isinstance(isScaled, bool):
-            raise Exception("\n\nERROR: the isScaled value must be a boolean")
-
-        self._isScaled = isScaled
+    def set_isScaled(self) -> None:
+        if self._isScaled:
+            errmsg = "\n\nERROR: The motif matrix has already been scaled.\n"
+            raise AssertionError(errmsg)
+        self._isScaled = True
 
 
-    def getMotif_matrix(self) -> pd.DataFrame:
-        return self._count_matrix
+    def _get_motifMatrix(self) -> np.ndarray:
+        if self._count_matrix.size == 0 or sum(sum(self._count_matrix)) == 0:
+            errmsg = "\n\nERROR: \"self._count_matrix\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._count_matrix
+    
+    @property
+    def countMatrix(self):
+        return self._get_motifMatrix()
+    
+
+    def _get_motifScoreMatrix(self) -> np.ndarray:
+        if self._score_matrix.size == 0 or sum(sum(self._score_matrix)) == 0:
+            errmsg = "\n\nERROR: \"self._score_matrix\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._score_matrix
+
+    @property
+    def scoreMatrix(self):
+        return self._get_motifScoreMatrix()
 
 
-    def getMotif_scoreMatrix(self) -> np.ndarray:
-        return self._score_matrix
+    def _get_motifPvalMat(self) -> np.ndarray:
+        if self._pval_matrix.size == 0 or sum(self._pval_matrix) == 0:
+            errmsg = "\n\nERROR: \"self._pval_matrix\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._pval_matrix
+    
+    @property
+    def pvalMatrix(self):
+        return self._get_motifPvalMat()
 
 
-    def getMotif_pval_mat(self) -> np.array:
-        return self._pval_matrix
-
-
-    def getMin_val(self) -> int:
+    def _get_minVal(self) -> int:
         return self._min_val
 
+    @property
+    def minval(self):
+        return self._get_minVal()
 
-    def getMax_val(self) -> int:
+
+    def _get_maxVal(self) -> int:
         return self._max_val
 
+    @property
+    def maxval(self):
+        return self._get_maxVal()
 
-    def getScale(self) -> int:
+
+    def _get_scale(self) -> int:
         return self._scale
 
+    @property
+    def scale(self):
+        return self._get_scale()
 
-    def getOffset(self) -> np.double:
+
+    def _get_nucsmap(self):
+        if not bool(self._nucsmap):
+            errmsg = "\n\nERROR: \"self._nucsmap\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._nucsmap
+    
+    @property
+    def nucsmap(self):
+        return self._get_nucsmap()
+
+
+    def _get_offset(self) -> np.double:
         return self._offset
 
+    @property
+    def offset(self):
+        return self._get_offset()
 
-    def getBg(self) -> dict:
-        return self._bg
+
+    def _get_bg(self) -> dict:
+        if not bool(self._bg):
+            errmsg = "\n\nERROR: \"self._bg\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._bg
+
+    @property
+    def bg(self):
+        return self._get_bg()
 
 
-    def getWidth(self) -> int:
+    def _get_width(self) -> int:
         return self._width
 
-
-    def getMotifID(self) -> str:
-        return self._motif_id
-
-
-    def getMotifName(self) -> str:
-        return self._motif_name
+    @property
+    def width(self):
+        return self._get_width()
 
 
-    def getAlphabet(self) -> List[str]:
-        return self._alphabet
+    def _get_motifID(self) -> str:
+        if not self._motif_id:
+            errmsg = "\n\nERROR: \"self._motif_id\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._motif_id
+
+    @property
+    def motifID(self):
+        return self._get_motifID()
 
 
-    def getIsScaled(self) -> bool:
+    def _get_motifName(self) -> str:
+        if not self._motif_name:
+            errmsg = "\n\nERROR: \"self._motif_name\" is empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._motif_name
+
+    @property
+    def motifName(self):
+        return self._get_motifName()
+
+
+    def _get_alphabet(self) -> List[str]:
+        if not self._alphabet:
+            errmsg = "\n\nERROR: \"self._alphabet\" si empty.\n"
+            raise AttributeError(errmsg)
+        else:
+            return self._alphabet
+    
+    @property
+    def alphabet(self):
+        return self._get_alphabet()
+
+
+    def _get_isScaled(self) -> bool:
         return self._isScaled
+
+    @property
+    def isScaled(self):
+        return self._get_isScaled()
 
 
     def compute_minValue(self) -> None:
-        motif_matrix = self.getMotif_matrix()
-        min_value = motif_matrix.min().sum()
+        min_value = self._score_matrix.min()
         self._min_val = min_value
 
 
-    def print(self,
-              matrix: str
-    ) -> None:
-        
-        allowed_matrices = ["raw_counts", "score_matrix", "pval_matrix"]
-
-        if matrix not in allowed_matrices:
-            raise ValueError("ERROR: unknown Motif matrix to print")
-
-        if str(matrix) == "raw_counts":
-            print(self._count_matrix)
-        elif str(matrix) == "score_matrix":
-            print(self._score_matrix)
-        elif str(matrix) == "pval_matrix":
-            print(self._pval_matrix)
-        else:
-            # we should not reach this point
-            raise ValueError("ERROR: unknown Motif matrix to print")
+    def print(self, matrix: str) -> None:
+        if not isinstance(matrix, str):
+            errmsg = "\n\nERROR: Expected str, got {}.\n"
+            raise TypeError(errmsg.format(type(matrix).__name__))
+        if not matrix:
+            errmsg = "\n\nERROR: Unable to guess what should be printed.\n"
+            raise ValueError(errmsg)
+        available_matrices = ["raw_counts", "score_matrix", "pval_matrix"]
+        if matrix not in available_matrices:
+            errmsg = "\n\nERROR: Unknown motif matrix.\n"
+            raise ValueError(errmsg)
+        if matrix == "raw_counts": print(self._count_matrix)
+        elif matrix == "score_matrix": print(self._score_matrix)
+        elif matrix == "pval_matrix": print(self._pval_matrix)
+        else:  # we should never reach this point
+            errmsg = "\n\nERROR: Unknown motif matrix.\n"
+            raise ValueError(errmsg)
     
 # end of Motif
 
