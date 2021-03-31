@@ -386,7 +386,7 @@ class Findmotif(Workflow):
     _text_only: bool
     _qvalueT: bool
     _verbose: bool
-    _test: bool = True  # used to test the findmotif worflow (manually set)
+    _test: bool = False  # used to test the findmotif worflow (manually set)
 
     # the following variables cannot be both True at the same time
     _has_graph_genome: bool = False
