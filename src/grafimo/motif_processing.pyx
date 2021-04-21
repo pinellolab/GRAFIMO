@@ -553,8 +553,11 @@ cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet, nucsmap, debug):
     cdef double prob
     cdef double odds
     cdef double logodds
-    cdef double epsilon = 0.001
+    cdef double epsilon
 
+    totBG = 0
+    totFG = 0
+    epsilon = 0.001
     motif_log_odds = np.zeros(probs_matrix.shape, dtype=np.double)
     for nuc in alphabet:
         nucidx = nucsmap[nuc]
