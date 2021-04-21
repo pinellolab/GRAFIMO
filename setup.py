@@ -13,7 +13,7 @@ import sys
 
 try:  # sphinx could not be available
     from sphinx.setup_command import BuildDoc
-except:
+except ImportError:
     errmsg = "\n\nPlease install \"sphinx\" before installing GRAFIMO.\n"
     sys.stderr.write(errmsg)
     sys.exit(3)
