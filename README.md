@@ -44,6 +44,7 @@ pip3 install numpy
 pip3 install statsmodels
 pip3 install sphinx
 pip3 install numba
+pip3 install colorama
 ```
 
 ### Build
@@ -150,20 +151,23 @@ For further details on GRAFIMO usage refer to our [Wiki](https://github.com/pine
 
 ### Searching potential motif occurrences with GRAFIMO
 
-**Input**
+#### Input
 
 GRAFIMO requires three mandatory arguments:
+
 - path to a directory containing the chromosomes VGs (XG and GBWT indexes) or path to the whole genome variation graph (XG and GBWT indexes). See [VG's wiki](https://github.com/vgteam/vg/wiki) for further details on XG and GBWT indexes.
+
 - path to PWM motif file in MEME or JASPAR format
+
 - BED file containing a set of genomic regions where GRAFIMO will search the motif occurrences
 
-**Searching motif**
+#### Searching motif
 
-The main functionalities of GRAFIMO is to perform a haplotype and variant-aware search of potential DNA motif occurrences in genome variation graph. 
+The main functionality of GRAFIMO is to perform a haplotype and variant-aware search of potential DNA motif occurrences in genome variation graph. 
 
 Here we assume that the genome variation graph (VG) has been built constructing a VG for each chromosome. If working with a single whole genome variation graph just substitute the argument ```-d``` with ```-g``` followed by the path to the whole genome VG. In the next section will be presented how to build a VG with GRAFIMO.
 
-Note that in both cases the XG and GBWT indexes of the VG  must be stored in the same location.
+Note that in both cases **the XG and GBWT indexes of the VG  must be stored in the same location**.
 
 For further details refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki).
 
@@ -172,10 +176,10 @@ If you are working in the ```tutorials/findmotif_tutorial``` directory, to run G
 grafimo findmotif -d data/mygenome/ -m  data/example.meme -b data/regions.bed
 ```
 
-By default GRAFIMO will create a directory in the current location called `grafimo_out_PID_MOTIFID`, containing the results. For further details on result files see **Results description** section.
+By default GRAFIMO will create a directory called `grafimo_out_PID_MOTIFID`, containing the results. For further details on result files see **Results description** section.
 
 
-**Advanced options**
+#### Advanced options
 
 ***Using background distributions***
 
@@ -210,14 +214,14 @@ If you are working in ```tutorials/findmotif_tutorial``` directory, to run GRAFI
 grafimo findmotif -d data/mygenome -m data/example.meme -b data/regions.bed --qvalueT -t 1e-4
 ```
 
-**For more options**
+#### For more options
 
 For more options refer to our [Wiki](https://github.com/pinellolab/GRAFIMO/wiki) or type
 ```
 grafimo -h
 ```
 
-**Results description**
+#### Results description
 
 GRAFIMO results are reported in three files (stored in output directory):
 - tab-delimited report (TSV report)
@@ -252,11 +256,11 @@ GRAFIMO allows also to build a genome variation graph from user data. To constru
 
 GRAFIMO builds the genome variation graph by constructing a VG for each chromosome. This allows a faster and more efficient motif search on the genome variation graph. 
 
-Note that this genome variation graph building method is also suggested by VG developers.
+Note that this genome variation graph building approach is suggested by VG developers.
 
 GRAFIMO will construct the XG and the GBWT index for each chromosome. The XG and GBWT indexes allow a faster and haplotype-aware motif search on VG. 
 
-Before attempting to build the VG it is very important to make sure that the chromosome names in the VCF and in the reference FASTA sequence headers match. For example, if in the VCF the chromosome 1 is named `1`, the header of chromosome 1 sequence on the reference FASTA file should be `>1`, and not `>chr1`.
+Before attempting to build the VG it is very important to make sure that the chromosome names in the VCF and in the reference FASTA sequence headers match. For example, if in the VCF the chromosome 1 is named `1`, the header of chromosome 1 sequence on the reference FASTA file should be `>1`, and not something like `>chr1`.
 
 If you are in ```tutorials/buildvg_tutorial``` directory, to build a VG with GRAFIMO
 ```
@@ -272,6 +276,12 @@ Li, Shan, and Ivan Ovcharenko. "Human enhancers are fragile and prone to deactiv
 Guo, Yu Amanda, et al. "Mutation hotspots at CTCF binding sites coupled to chromosomal instability in gastrointestinal cancers." *Nature communications* 9.1 (2018): 1-14.
 
 Garrison, Erik, et al. "Variation graph toolkit improves read mapping by representing genetic variation in the reference." *Nature biotechnology* 36.9 (2018): 875-879.
+
+## Citation
+
+If you use GRAFIMO in your research, please cite us:
+
+Tognon, Manuel, et al. "GRAFIMO: variant and haplotype aware motif scanning on pangenome graphs." bioRxiv (2021).
 
 ## License
 

@@ -20,18 +20,19 @@ space on disk and save memory when scanning it.
 """
 
 
-from grafimo.utils import die, sigint_handler
+from grafimo.utils import die, sigint_handler, ALL_CHROMS, exception_handler
 from grafimo.workflow import BuildVG
-from grafimo.GRAFIMOException import VGException, ValueException, \
-    SubprocessError, FileReadingException
-from typing import List
+from grafimo.GRAFIMOException import VGError, ValueException, \
+    SubprocessError, FileReadError
+from typing import List, Dict
 import subprocess
 import signal
 import time
+import sys
 import os
 
 
-def get_reference_genome_from_ucsc() -> str:
+def get_reference_genome_from_ucsc(debug) -> str:
     """Download the reference genome (hg38 assembly), from the UCSC
     database, in the current working directory and returns the path to 
     the corresponding FASTA file.
@@ -52,43 +53,33 @@ def get_reference_genome_from_ucsc() -> str:
     errmsg: str
 
     # download genome
-    address = 'ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz'
-    cmd = 'wget -c {0}'.format(address)
+    address = "ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz"
+    cmd = "wget -c {}".format(address)
     # the genome will be downloaded in the current directory
     code = subprocess.call(cmd, shell=True)  
     if code != 0:
-        errmsg = ''.join(["\n\nERROR: an error occurred while executing ", 
-                               cmd, ". Exiting"])
-        raise SubprocessError(errmsg)
-
-    # decompress genome
+        errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+        exception_handler(SubprocessError, errmsg.format(cmd), debug)
+    # uncompress genome
     print("Uncompressing the genome...")
-    
     genome_comp: str = './hg38.fa.gz'
     if not os.path.exists(genome_comp):
-        errmsg = ''.join(["\n\nERROR: ", genome_comp, " not found"])
-        raise FileNotFoundError(errmsg)
-
+        errmsg = "Unable to find {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(genome_comp), debug)
     cmd = 'gunzip {0}'.format(genome_comp)
     code = subprocess.call(cmd, shell=True)
-
     if code != 0:
-        errmsg = ''.join(["\n\nERROR: an error occurred while executing ", cmd, 
-                          ". Exiting"])
-        raise SubprocessError(errmsg)
-
+        errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+        exception_handler(SubprocessError, errmsg.format(cmd), debug)
     # remove FASTA.GZ file if still present
     if os.path.exists(genome_comp):
         cmd = 'rm {0}'.format(genome_comp)
         code = subprocess.call(cmd, shell=True)
-
         if code != 0:
-            errmsg = ''.join(["\n\nERROR: an error occurred while executing ", 
-                                   cmd, ". Exiting"])
-            raise SubprocessError(errmsg)
-
+            errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+            exception_handler(SubprocessError, errmsg.format(cmd), debug)
     # get the path to the genome file
-    genome_uncomp: str = "./hg38.fa"
+    genome_uncomp: str = "./hg38.fa"  # should be in the current dir
     assert os.path.exists(genome_uncomp)
     genome: str = os.path.abspath(genome_uncomp)
 
@@ -97,14 +88,14 @@ def get_reference_genome_from_ucsc() -> str:
 # end of get_reference_genome_from_ucsc()
 
 
-def get_1000GProject_vcf() -> str:
+def get_1000GProject_vcf(debug) -> str:
     """Downloads a WGS VCF file from the 1000 Genome Project database
     (phase 3), containing SNVs and indels. The present file is used for 
     VG construction and graph indexing test purposes. 
     
     Since the variants present in this file are not phased, it cannot be 
     used to build the GBWT index and the corresponding haplotypes cannot
-    be used. To use this features we must phase the VCF.
+    be used. To use this features the VCF must be phased first.
 
     Parameters
     ----------
@@ -124,17 +115,14 @@ def get_1000GProject_vcf() -> str:
     address = 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/'
     address += '1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/'
     address += 'ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz'
-
     cmd = 'wget -c {0}'.format(address)
-
     code = subprocess.call(cmd, shell=True)
-
     if code != 0:
-        errmsg = ''.join(["\n\nERROR: An error occurred while executing ", 
-                               cmd, ". Exiting"])
-        raise SubprocessError(errmsg)
-
+        errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+        exception_handler(SubprocessError, errmsg.format(cmd), debug)
+    # vcf should be in the current dir
     vcf_file: str = './ALL.wgs.shapeit2_integrated_snvindels_v2a.GRCh38.27022019.sites.vcf.gz'
+    assert os.path.exists(vcf_file)
     vcf: str = os.path.abspath(vcf_file)
 
     return vcf
@@ -142,7 +130,7 @@ def get_1000GProject_vcf() -> str:
 # end of get1000GProject_vcf()
 
 
-def construct_vg(buildvg_args: BuildVG) -> None:
+def construct_vg(buildvg_args: BuildVG, debug: bool) -> None:
     """ Create the genome graph from the given genome reference and 
     phased VCF file given.
     
@@ -168,171 +156,137 @@ def construct_vg(buildvg_args: BuildVG) -> None:
     """
     errmsg: str
     if not isinstance(buildvg_args, BuildVG):
-        errmsg = "Unknown arguments object type. "
-        errmsg += "Cannot build the genome variation graph. Exiting"
-        raise ValueError(errmsg)
+        errmsg = "Expectd BuildVG object, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(buildvg_args).__name__), debug)
     
     # read the arguments to build the VGs
-    reindex: bool = buildvg_args.get_reindex()
-    chroms: List[str] = buildvg_args.get_chroms()
-    threads: int = buildvg_args.get_cores()
-    outdir: str = buildvg_args.get_outdir()
-    verbose: bool = buildvg_args.get_verbose()
+    reindex: bool = buildvg_args.reindex
+    chroms: List[str] = buildvg_args.chroms
+    chroms_prefix: str = buildvg_args.chroms_prefix
+    namemap: Dict = buildvg_args.namemap
+    threads: int = buildvg_args.cores
+    outdir: str = buildvg_args.outdir
+    verbose: bool = buildvg_args.verbose
     test: bool = buildvg_args.get_test()  # manually set in the code
-
+    msg: str
     reference: str
     vcf: str
 
     if test:
-        reference = get_reference_genome_from_ucsc()
-        vcf = get_1000GProject_vcf()
-
+        reference = get_reference_genome_from_ucsc(debug)
+        vcf = get_1000GProject_vcf(debug)
     else:
-        reference = buildvg_args.get_reference_genome()
-        vcf = buildvg_args.get_vcf()
-    # end if
+        reference = buildvg_args.reference_genome
+        vcf = buildvg_args.vcf
 
     if verbose:
         print("using reference genome: ", reference)
         print("Using VCF file: ", vcf, "\n\n")
-    # end if
-
-    msg: str
 
     if verbose:
         start_c: float = time.time()
-        msg = "Reading chromosome from reference file for which will be built the VG..."
-        print(msg)
-        
-    # read the chromosome present in the used reference file
-    chroms_available: List[str] = get_chromlist(reference)
-        
+        print("Reading chromosome names from {}...".format(reference))
+    # read chromosome names in reference FASTA
+    chroms_available: List[str] = get_chromlist(reference, debug)
     if verbose:
         end_c: int = time.time()
         print("done in %.2fs" % (end_c - start_c))
         print("Found chromosomes:\n", chroms_available, end="\n\n")
-
-    if len(chroms) == 1 and chroms[0] == 'ALL_CHROMS':
+    if len(chroms) == 1 and chroms[0] == ALL_CHROMS:
         chroms: List[str] = chroms_available
     else:
-        # check if the given chromosome number is among those whose sequence 
-        # is in the reference file
-        if (any(True for c in chroms if c not in chroms_available)):
-            raise ValueError("Unknown chromosome given")
-        
-    # end if
+        # check user-defined chromosome names consistency with names in 
+        # reference
+        for c in chroms:
+            if c not in chroms_available:
+                errmsg = "Chromosome \"{}\" not found among names in {}.\n"
+                exception_handler(ValueError, errmsg.format(c, reference), debug)
 
     cwd: str = os.getcwd()
-
     cmd: str
     code: int
-
     # check if the VCF file has already been indexed with tabix
     if not tbiexist(vcf):
-        msg = ''.join(["TBI file not found for ", vcf.split('/')[-1], 
-                       ". Indexing the VCF file with tabix..."])
-        print(msg)
+        msg = "TBI file not found for {}. Indexing VCF file with tabix..."
+        print(msg.format(vcf.split('/')[-1]))
         cmd = 'tabix -p vcf {0}'.format(vcf)
         code = subprocess.call(cmd, shell=True)
-
-        if code != 0:
-            # tabix didn't work
-            errmsg = ''.join(["\n\nERROR: an error occurred while executing ", 
-                              cmd, ". Exiting"])
-            raise SubprocessError(errmsg)
-
-    elif reindex:  # the user want to reindex the VCF file with tabix
-        msg = ''.join(["Reindexing ", vcf.split('/')[-1], "...\n"])
-        print(msg)
-
-        # remove the existing TBI file
+        if code != 0:  # tabix didn't work
+            errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+            exception_handler(SubprocessError, errmsg.format(cmd), debug)
+    elif reindex:  # user asked to reindex VCF 
+        msg = "Reindexing {}...\n"
+        print(msg.format(vcf.split('/')[-1]))
+        # remove old index
         cmd = "rm {0}".format(''.join([vcf, ".tbi"]))
         code = subprocess.call(cmd, shell=True)
-
         if code != 0:
-            errmsg = ''.join(["\n\nERROR: an error occurred while executing ", 
-                              cmd, ". Exiting"])
-            raise SubprocessError(errmsg)
-
+            errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+            exception_handler(SubprocessError, errmsg.format(cmd), debug)
         # reindex the VCF
         cmd = "tabix -p vcf {0}".format(vcf)
         code = subprocess.call(cmd, shell=True)
-
         if code != 0:
             # tabix didn't work
-            errmsg = ''.join(["\n\nERROR: an error occurred while executing ", 
-                              cmd, ". Exiting"])
-            raise SubprocessError(errmsg)
-        # end if
+            errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+            exception_handler(SubprocessError, errmsg.format(cmd), debug)
     # end if
 
     # enter the output directory
     os.chdir(outdir)
-
-    # build the VG for each chromosome or a user defined
-    # subset of them
-    for chrom_n in chroms:
-
-        chrom: str = ''.join(['chr', chrom_n])
+    if chroms_prefix: assert not bool(namemap)
+    if bool(namemap): assert chroms_prefix != "chr"
+    # build the VG for each chromosome or only for those told by user
+    for chrname in chroms:
+        if not bool(namemap): 
+            chrom: str = "".join([chroms_prefix, chrname])
+        elif bool(namemap): 
+            try:
+                chrom: str = namemap[chrname]
+            except:
+                errmsg = "Missing out name map for chromosome \"{}\".\n'"
+                exception_handler(KeyError, errmsg.format(chrname), debug)
         vg: str = ''.join([".", chrom, '.vg'])
-
-        # build the VG for the current chromosome
+        # build VG for current chromosome
         if verbose:
             start_build: float = time.time()
-
-        code = build_vg(vg, reference, vcf, chrom_n, threads)
+        code = build_vg(vg, reference, vcf, chrname, threads)
         if code != 0:
-            msg = '\n\nERROR: an error occurred during {0} construction. '.format(vg)
-            msg += 'Unable to build the VG of the genome using {0} and {1}'.format(reference,
-                                                                                   vcf)
-            raise VGException(msg)
-        # end if
-
+            errmsg = "An error occurred during construction of {}.\n"
+            exception_handler(VGError, errmsg.format(vg), debug)
         if verbose:
             end_build: float = time.time()
-            msg = "Elapsed time to build {0} ".format(vg)   
-            print(msg, "%.2fs" % (end_build - start_build))
-        # end if
-
-        # to query efficiently the VGs we index them (VG -> XG)
+            msg = "Elapsed time to build {}:"   
+            print(msg.format(vg), "%.2fs" % (end_build - start_build), sep=" ")
+        # index VG
         if verbose:
             start_index: float = time.time()
-
-        msg = ''.join(["Indexing ", vg, ' and building the GBWT index...'])
-        print(msg)
-
-        code = indexVG(vg, vcf, threads, verbose)
-
+        msg = "Indexing {} VG and building the GBWT index..."
+        print(msg.format(chrom))
+        code = indexVG(vg, vcf, threads, verbose, debug)
         if code != 0:
-            errmsg = "\n\nERROR: an error occurred while indexing {0}.".format(vg)
-            errmsg += "\nUnable to index {0}. Exiting".format(vg)
-            raise VGException(errmsg)
-        # end if
-
+            errmsg = "An error occurred while indexing {}."
+            exception_handler(VGError, errmsg.format(vg), debug)
         if verbose:
             end_index: float = time.time()
-            msg = "Elapsed time to index {0}".format(vg)
-            print(msg, "%.2fs" % (end_index - start_index))
+            msg = "Elapsed time to index {}"
+            print(msg.format(vg), "%.2fs" % (end_index - start_index), sep=" ")
         # end if
 
         # The majority of applications work only with indexed graph,
         # so to save disk space is worth to delete the VGs and keep
-        # only the XGs (is simple to get back using VG built-in functions)
+        # only the XGs (is simple to go back using VG built-in functions)
         if verbose:
             print("Deleting {0}".format(vg))
-
         cmd = 'rm {0}'.format(vg)
         subprocess.call(cmd, shell=True)
-
-        if code != 0:  # we have errors in the vg indexing
-            errmsg = ''.join(["\n\nERROR: an error occurred while executing ", cmd, ". Exiting"])
-            raise SubprocessError()
-        # end if
+        if code != 0: 
+            errmsg = "An error occurred while executing \"{}\". Exiting.\n"
+            exception_handler(SubprocessError, errmsg.format(cmd), debug)
     # end for
 
-    # get the VGs location
+    # get VGs location
     graphs_loc: str = os.getcwd()
-
     # return to the original working directory
     os.chdir(cwd)
 
@@ -379,15 +333,12 @@ def build_vg(
     success: int
     build: str
 
-    build = 'vg construct -t {4} -r {1} -v {2} -R {0} -C -a -p > {3}'.format(chrom_num,
-                                                                         ref_genome, vcf,
-                                                                         vg, threads)
-
+    build = 'vg construct -t {4} -r {1} -v {2} -R {0} -C -a -p > {3}'.format(
+        chrom_num, ref_genome, vcf,vg, threads
+    )
     code: int = subprocess.call(build, shell=True)
-
     if code != 0:
-        # an error occurred during the construction of the VG for
-        # the current chromosome
+        # an error occurred during VG construction 
         success = 1
     else:
         # all went well
@@ -402,7 +353,8 @@ def indexVG(
     vg: str, 
     vcf: str, 
     threads: int, 
-    verbose: bool
+    verbose: bool,
+    debug: bool
 ) -> int:
     """Construct the XG and GBWT indexes for the given genome variation 
     graph. These indexes are required to query the genome when extracting
@@ -432,33 +384,27 @@ def indexVG(
     """
 
     if not isinstance(vg, str):
-        raise ValueError("Invalid path to the genome variation graph. Exiting")
-
+        errmsg = "Expected str instance, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(vg).__name__), debug)       
     if not os.path.exists(vg):
-        errmsg = "unable to find {0}".format(vg)
-        raise FileExistsError(errmsg)
-
+        errmsg = "Unable to find {}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
     success: int
-
     # take chromosome name and add it the XG extension
     graph_name: str = vg.split('.')[-2]
     xg: str = ''.join([graph_name, ".xg"])
     gbwt: str = ''.join([graph_name, ".gbwt"])
-
     # perform indexing of the current genome variation graph
     if verbose:
         # print information about indexing 
-        vg_index: str = 'vg index -t {0} -G {1} -v {2} -x {3} {4} -p'.format(threads, 
-                                                                             gbwt, 
-                                                                             vcf, 
-                                                                             xg, 
-                                                                             vg)
+        vg_index: str = 'vg index -t {0} -G {1} -v {2} -x {3} {4} -p'.format(
+            threads, gbwt, vcf, xg, vg
+        )
     else:
-        vg_index = 'vg index -t {0} -G {1} -v {2} -x {3} {4}'.format(threads, gbwt, 
-                                                                     vcf, xg, vg)
-
+        vg_index = 'vg index -t {0} -G {1} -v {2} -x {3} {4}'.format(
+            threads, gbwt, vcf, xg, vg
+        )
     code: int = subprocess.call(vg_index, shell=True)
-
     if code != 0:
         success = 1
     else:
@@ -469,7 +415,7 @@ def indexVG(
 # end of indexVG()
 
 
-def get_chromlist(ref_genome: str) -> List[str]:
+def get_chromlist(ref_genome: str, debug: bool) -> List[str]:
     """Scan the reference genome FASTA file to find the chromosomes for
     which there a sequence is available.
     
@@ -488,34 +434,39 @@ def get_chromlist(ref_genome: str) -> List[str]:
         reference genome FASTA file 
     """
 
+    assert os.path.isfile(ref_genome)
     # redefine default SIGINT handler
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     # overwrite original SIGINT handler
     signal.signal(signal.SIGINT, original_sigint_handler)  
     chroms = list()
-
-    print(
-        "Reading the valid chromosome names from the given reference genome...\n"
-        )
-
+    
     try:
-        with open(ref_genome, mode='r') as infile:
-            for line in infile:
-                line =  line.strip()
-                if line[0] == ">":  # this line contains the chromosome name
-                    if line[:4] == ">chr":
-                        chroms.append(line[4:])  # remove the starting '>chr'
-                    else:
-                        chroms.append(line[1:])  # remove the starting '>
-
-    except Exception as e:
-        raise e 
-
+        with open(ref_genome, mode='r') as ifstream:
+            while True:
+                line = ifstream.readline()
+                if not line: return  # empty file ?
+                if line[0] == ">": break  # data start here
+            while True:
+                if line[0] != ">":
+                    errmsg = "Sequence names in FASTA file should begin with \">\"\n."
+                    exception_handler(FileReadError, errmsg, debug)
+                else:
+                    seqname = line.rstrip().split()[0][1:]  # skip ">"
+                line = ifstream.readline()
+                while True:
+                    if not line: break  # empty sequence ?
+                    if line[0] == ">": break  # sequence end
+                    line = ifstream.readline()
+                chroms.append(seqname)
+                if not line: break  # reached EOF
     except KeyboardInterrupt:
         sigint_handler()
-
+    except:
+        errmsg = "A problem was encountered reading {}\n."
+        exception_handler(FileReadError, errmsg.format(ref_genome), debug)
     finally:
-        infile.close()  # close input stream
+        ifstream.close()
 
     return chroms
 
@@ -523,27 +474,23 @@ def get_chromlist(ref_genome: str) -> List[str]:
 
 
 def tbiexist(vcf: str) -> bool:
-    """Check if the given VCF file has been indexed with tabix (chek the 
-    existance of VCFname.vcf.gz.tbi file)
+    """Check if already exists an index for the VCF file.
 
     Parameters
     ----------
     vcf : str
-        path to the VCF file to be checked for a corresponding TBI index
-        file 
+        path to VCF file
         
     Returns
     -------
     bool
-        TBI index search status
+        Check result
     
     """
 
-    vcf_tbi: str = ''.join([vcf, '.tbi'])
-
+    vcf_tbi: str = ".".join([vcf, "tbi"])
     if os.path.isfile(vcf_tbi):
         return True
-
     return False
 
 # end of tbiexist()

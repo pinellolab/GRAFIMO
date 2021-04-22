@@ -14,17 +14,23 @@ from grafimo.motif_set import MotifSet
 from grafimo.extract_regions import scan_graph
 from grafimo.res_writer import print_results, write_results
 from grafimo.score_sequences import compute_results
+from grafimo.utils import exception_handler
+
 import pandas as pd
+
 import time
 import sys
 import os
 
 
 # version of GRAFIMO
-__version__ = '1.1.2'
+__version__ = '1.1.4'
 
 
-def buildvg(args_obj: BuildVG) -> None:
+sys.excepthook = exception_handler
+
+
+def buildvg(args_obj: BuildVG, debug: bool) -> None:
     """Call the functions needed to constuct the genome variation graph 
     from a reference FASTA file and a phased VCF file.
 
@@ -37,26 +43,27 @@ def buildvg(args_obj: BuildVG) -> None:
     """
 
     if not isinstance(args_obj, BuildVG):
-        raise ValueError("Unknown arguments object type")
-
+        errmsg = "Expected BuildVG object, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(args_obj).__name__), debug)
     printWelcomeMsg()
-
-    # if verbose == True will be printed a lot of unusefull stuff
-    verbose = args_obj.get_verbose()
-
+    # if verbose == True print a lot of info
+    verbose = args_obj.verbose
     print("\n\nBuilding the VG for chromosome:")
-    for c in args_obj.get_chroms():
+    for c in args_obj.chroms:
         print(c, end=" ")
     print("\n")  # newline
 
     if verbose:
-        print("User parameters:")
-        print("\t- Reference genome: ", args_obj.get_reference_genome())
-        print("\t- VCF file: ", args_obj.get_vcf())
-        print("\t- Reindex: ", args_obj.get_reindex())
-        print("\t- Chromosomes: ", args_obj.get_chroms())
-        print("\t- Cores: ", args_obj.get_cores())
-        print("\t- Output directory: ", args_obj.get_outdir())
+        print("Buildvg user parameters:")
+        print("\t- Reference genome: ", args_obj.reference_genome)
+        print("\t- VCF file: ", args_obj.vcf)
+        print("\t- Reindex: ", args_obj.reindex)
+        print("\t- Chromosomes: ", args_obj.chroms)
+        print("\t- Chromosome prefix: ", args_obj.chroms_prefix)
+        print("\t- Name-map: ", args_obj.namemap)
+        print("\t- Cores: ", args_obj.cores)
+        print("\t- Output directory: ", args_obj.outdir)
+        print("\t- Debug:", debug)
         print("\t- Verbose: ", verbose)
         print("\t- Test mode: ", args_obj.get_test())
     # end if
@@ -65,12 +72,12 @@ def buildvg(args_obj: BuildVG) -> None:
         print("\nBeginning VGs construction\n")
 
     # begin VGs construction
-    construct_vg(args_obj)  # the VGs will be stored in the defined output directory
+    construct_vg(args_obj, debug)  # the VGs will be stored in the defined output directory
 
 # end of buildvg()
 
 
-def findmotif(args_obj: Findmotif) -> None:
+def findmotif(args_obj: Findmotif, debug: bool) -> None:
     """Call the functions needed to scan the genome variation graph for 
     the occurrence of a DNA motif, in genomic regions defined in the given 
     BED file.
@@ -82,147 +89,110 @@ def findmotif(args_obj: Findmotif) -> None:
         graph for the occurrences of the given DNA motif
 
     """
-
+    
     if not isinstance(args_obj, Findmotif):
-        raise ValueError("Unknown arguments object type")
-
+        errmsg = "Expected Findmotif, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(args_obj).__name__), debug)
     printWelcomeMsg()
-
-    # if verbose == True will be printed a lot of additional information
-    verbose: bool = args_obj.get_verbose()
-
-    cores: int = args_obj.get_cores()  # cores to use
+    # if verbose == True print a lot of info
+    verbose: bool = args_obj.verbose
+    cores: int = args_obj.cores  # cores to use
 
     if verbose:
-        print("User parameters:")
-        if args_obj.has_graph_genome():
-            print("\t- Genome variation graph: ", args_obj.get_graph_genome())
-        elif args_obj.has_graph_genome_dir():
-            print("\t- Genome variation graphs directory: ", args_obj.get_graph_genome_dir())
-
-        print("\t- BED file: ", args_obj.get_bedfile())
-        print("\t- Motif file: ", args_obj.get_motif())
-        print("\t- Chromosomes: ", args_obj.get_chroms())
-        print("\t- Background: ", args_obj.get_bgfile())
-        print("\t- Pseudocount: ", args_obj.get_pseudo())
-        print("\t- Threshold: ", args_obj.get_threshold())
-        print("\t- Output directory: ", args_obj.get_outdir())
+        print("Findmotif user parameters:")
+        if args_obj.has_graphgenome():
+            print("\t- Genome variation graph: ", args_obj.graph_genome)
+        elif args_obj.has_graphgenome_dir():
+            print("\t- Genome variation graphs directory: ", args_obj.graph_genome_dir)
+        else:  # both False
+            errmsg = "Something went wrong during commandline args parse.\n"
+            exception_handler(IOError, errmsg, debug)
+        print("\t- BED file: ", args_obj.bedfile)
+        print("\t- Motif file: ", args_obj.motif)
+        print("\t- Chromosomes: ", args_obj.chroms)
+        print("\t- Chromome prefix: ", args_obj.chroms_prefix)
+        print("\t- Name-map: ", args_obj.namemap)
+        print("\t- Background: ", args_obj.bgfile)
+        print("\t- Pseudocount: ", args_obj.pseudo)
+        print("\t- Threshold: ", args_obj.threshold)
+        print("\t- Output directory: ", args_obj.outdir)
         print("\t- Cores: ", cores)
-        print("\t- recomb: ", args_obj.get_recomb())
-        print("\t- Top graphs: ", args_obj.get_top_graphs())
-        print("\t- no-qvalue: ", args_obj.get_no_qvalue())
-        print("\t- no-reverse: ", args_obj.get_no_reverse())
-        print("\t- Text only: ", args_obj.get_text_only())
-        print("\t- Threshold on q-values: ", args_obj.get_qvalueT())
+        print("\t- recomb: ", args_obj.recomb)
+        print("\t- Top graphs: ", args_obj.top_graphs)
+        print("\t- no-qvalue: ", args_obj.noqvalue)
+        print("\t- no-reverse: ", args_obj.noreverse)
+        print("\t- Text only: ", args_obj.text_only)
+        print("\t- Threshold on q-values: ", args_obj.qvalueT)
         print("\t- Verbose: ", verbose)
         print("\t- Test mode: ", args_obj.get_test())
         print()  # newline
     # end if
 
     errmsg: str
-
-    # if we have a whole genome graph, check that it is indexed (XG)
-    # index it, otherwise
-    if args_obj.has_graph_genome():
-        vg: str = args_obj.get_graph_genome()
-
-        if vg.split('.')[-1] == 'vg':
-            warnmsg: str = "\nWARNING: the given VG has not been indexed. "
-            warnmsg += "To scan it, the VG must be indexed."
-            print(warnmsg)
-            answer = input("Do you want to index it now? (y/n) ")
-
+    # if genome graph is given, check that it is indexed (XG), otherwise index it
+    if args_obj.has_graphgenome():
+        if args_obj.graph_genome.split('.')[-1] == 'vg':
+            warnmsg: str = "\nWARNING: {} is not indexed. To scan a VG, it should be indexed."
+            # quick IO with user
+            answer = -1  # ensure we enter while loop
             while answer.upper() != 'Y' and answer.upper() != 'N':
-                print(warnmsg)
-                answer: str = input("Do you want to index it now? (y/n) ")
-
-
+                print(warnmsg.format(args_obj.graph_genome))
+                answer: str = input("Do you want to index it now? (y/n)\n")
             if answer.upper() == 'Y':
                 vcf: str = input(
-                    "Enter the path to the VCF file to use to include haplotypes:\n"
-                    )
-                
+                    "Enter the path to the VCF file for haplotype tracking:\n"
+                )
                 if vcf.split(".")[-2] != "vcf" or vcf.split(".")[-1] != "gz":
-                    errmsg = "\n\nERROR: the given file is not a zipped VCF file (*.vcf.gz)"
-                    raise Exception(errmsg)
-                
+                    errmsg = "Unable to use {} for haplotype tracking. The VCF must be compressed (e.g.\"myvcf.vcf.gz\".\n"
+                    exception_handler(ValueError, errmsg.format(vcf), debug)
                 if not os.path.isfile(vcf):
-                    errmsg = "\n\nERROR: unable to find the given VCF file"
-                    raise FileNotFoundError(errmsg)
-                
-                code: int = indexVG(vg, vcf, cores, verbose)
-
+                    errmsg = "Unable to locate {}.\n"
+                    exception_handler(FileNotFoundError, errmsg.format(vcf), debug)
+                code: int = indexVG(args_obj.graph_genome, vcf, cores, verbose)  # VG indexing
                 if code != 0:
-                    errmsg = ''.join(["\n\nERROR: unable to index ", vg, 
-                                      ". Exiting"])
-                    raise Exception(errmsg)
-    
+                    errmsg = "An error occurred during {} indexing.\n"
+                    exception_handler(VGException, errmsg.format(args_obj.graph_genome), debug) 
             else:
-                errmsg = "\n\nTo proceed you need to provide a XG and a GBWT "
-                errmsg += "index for your genome graph. GRAFIMO will exit"
-                print(errmsg)
-                sys.exit(1)
-            
-            # end if
-
-            vg = vg.split('.vg')[-2]
-            vg = ''.join([vg, '.xg'])
-            args_obj.set_xg(vg)
+                errmsg = "To scan {} are required the XG and GBWT indexes.\n"
+                exception_handler(FileNotFoundError, errmsg.format(args_obj.graph_genome), debug)
+            vg_name = args_obj.graph_genome.split('.vg')[-2]
+            xg = ".".join([vg_name, "xg"])
+            args_obj.set_xg(xg)  # set indexed vg name (XG) 
         # end if
     # end if
 
-    # process the motifs
-    motifs: list = args_obj.get_motif()
+    # motif PWM processing
+    motifs: list = args_obj.motif
     mtfSet: MotifSet = MotifSet()
-
     for mtf in motifs:
         if verbose:
-            print("Processing motif(s) in: ", mtf, "\n")
-
-        m = get_motif_pwm(mtf, args_obj, cores)
-
+            print("Processing motif(s) in: {}".format(mtf))
+        m = get_motif_pwm(mtf, args_obj, cores, debug)
         if args_obj.get_test():
             for i in range(len(m)):
-                print("Score matrix:")
-                m[i].print("score_matrix")
-        # end if
-
+                print("Score matrix of {}:".format(mtf))
+                m[i].print("score_matrix")  
         mtfSet.addMotif(m)
-    # end for
-
-    motif_num: int = mtfSet.length()
-
     for mtf in mtfSet:
         # extract sequences
-        sequence_loc: str = scan_graph(mtf, args_obj)
-
+        sequence_loc: str = scan_graph(mtf, args_obj, debug)
         # score sequences
-        res: pd.DataFrame = compute_results(mtf, sequence_loc, args_obj)
-
+        res: pd.DataFrame = compute_results(mtf, sequence_loc, debug, args_obj)
         # write results
-        if args_obj.get_text_only():
-            print_results(res)
-        else:
-            write_results(res, mtf.getMotifID(), motif_num, args_obj)
-        # end if
-    # end for
+        if args_obj.text_only: print_results(res)  # print to stdout
+        else: write_results(res, mtf, mtfSet.size, args_obj, debug)
 
 # end of findmotif()
 
 
 def printWelcomeMsg() -> None:
-    """Prints the welcome message for GRAFIMO
-  
-    """
-    for _ in range(50):
-        print('*', end='')
-
+    """Print GRAFIMO welcome message"""
+    for _ in range(75): print('*', end='')
+    msg = "\n\tWelcome to GRAFIMO v{}"
     print()  # newline
-    print("\n\tWELCOME TO GRAFIMO v", __version__, sep='')
+    print(msg.format(__version__))
     print()  # newline
-
-    for _ in range(50):
-        print('*', end='')
+    for _ in range(75): print('*', end='')
     print()  # newline
 
 # end of printWelcomeMsg()

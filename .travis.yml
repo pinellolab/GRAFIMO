@@ -16,6 +16,7 @@ install:
   - pip3 install statsmodels
   - pip3 install sphinx
   - pip3 install numba
+  - pip3 install colorama
   - installationpath=$PWD
   - echo $installationpath
   - python3 setup.py install

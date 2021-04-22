@@ -8,8 +8,15 @@ from setuptools import setup, find_packages, Extension
 from distutils.version import LooseVersion
 from distutils.command.sdist import sdist as sd
 from distutils.command.build_ext import build_ext as be
-from sphinx.setup_command import BuildDoc
+
 import sys
+
+try:  # sphinx could not be available
+    from sphinx.setup_command import BuildDoc
+except ImportError:
+    errmsg = "\n\nPlease install \"sphinx\" before installing GRAFIMO.\n"
+    sys.stderr.write(errmsg)
+    sys.exit(3)
 
 
 if sys.version_info[:2] < (3,6): # python 3.7 is required
@@ -72,13 +79,12 @@ class SDist(sd):
         super().run()
 
 name = "GRAFIMO"
-version = '1.1'
-release = '1.1.2'
+version = '1.1.4'
 
 # definition of setup()
 setup(
       name='grafimo',
-      version=release,
+      version=version,
       author='Manuel Tognon',
       author_email='manu.tognon@gmail.com',
       url="https://github.com/pinellolab/GRAFIMO",
@@ -105,6 +111,7 @@ setup(
               'statsmodels>=0.11.0',
               'numba>=0.47',
               'sphinx>=3.5.2',
+              'colorama'
               ],
       extras_require={
           'dev': ['Cython']
