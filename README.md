@@ -44,6 +44,7 @@ pip3 install numpy
 pip3 install statsmodels
 pip3 install sphinx
 pip3 install numba
+pip3 install colorama
 ```
 
 ### Build
