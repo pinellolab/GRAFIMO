@@ -234,6 +234,10 @@ def get_parser() -> GRAFIMOArgumentParser:
                        "which could be obtained from the genetic variants encoded "
                        "in the VG. With this option the haplotypes encoded in "
                        "the VG are ignored.")
+    group.add_argument("--track-samples", action="store_true", default=False,
+                       dest="track_samples", help="Return the IDs (if encoded "
+                       "in input VG(s)) of subjects presenting each binding "
+                       "recovered potential motif occurrence.")
     group.add_argument("--qvalueT", action='store_true', default=False, 
                        dest='qval_t', help="Apply motif occurrence score "
                        "statistical significance threshold on q-values rather "
@@ -378,6 +382,8 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
             elif args.recomb:
                 parser.error(buildvg_err_msg.format("--recomb"))
                 die(1)
+            elif args.track_samples:
+                parser.error(buildvg_err_msg.format("--track-samples"))
             elif args.top_graphs != 0:  # if default ignored
                 parser.error(buildvg_err_msg.format("--top-graphs"))
                 die(1)
@@ -554,7 +560,6 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
                 # motif pwm
                 if not args.motif:
                     parser.error("No motif PWM given")
-
                 else:
                     motifs: List[str] = args.motif
                     for m in motifs:
@@ -637,12 +642,21 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
                 # threshold on q-value flag
                 if (not isinstance(args.qval_t, bool) or
                         (args.qval_t != False and args.qval_t != True)):
-                    parser.error("\"--qvalueT accepts only True or False values")
+                    parser.error("\"--qvalueT\" accepts only True or False values")
                     die(1)
                 elif args.no_qvalue == True and args.qval_t == True:
                     parser.error(
                         "Unable to apply statistical significance threshold on"
                         " q-values if you don't want them")
+                    die(1)
+
+                # track samples during VG scan
+                if (not isinstance(args.track_samples, bool) or
+                        (args.track_samples != False and 
+                        args.track_samples != True)):
+                    parser.error(
+                        "\"--track-samples\" accepts only True or False values"
+                    )
                     die(1)
 
                 # number of graph regions to store as PNG images

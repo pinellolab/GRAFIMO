@@ -11,6 +11,8 @@ from typing import List
 import pandas as pd
 import numpy as np
 
+import zlib
+
 
 class ResultTmp(object):
     """
@@ -87,6 +89,7 @@ class ResultTmp(object):
     _scores: List[np.double] = list()
     _pvalues: List[np.double] = list()
     _qvalues: List[np.double] = list()
+    _samples: List[bytes] = list()
     _frequencies: List[int] = list()
     _references: List[str] = list()
 
@@ -112,6 +115,7 @@ class ResultTmp(object):
             str(self._scores),
             str(self._pvalues),
             str(self._qvalues),
+            str(self._samples),
             str(self._frequencies),
             str(self._references),
         ])
@@ -237,8 +241,15 @@ class ResultTmp(object):
             raise TypeError(errmsg.format(type(qvalues).__name__))
         self._qvalues = qvalues
 
+
+    def add_samples(self, samples):
+        if not isinstance(samples, list):
+            errmsg = "\n\nERROR: Expected list, got {}}.\n"
+            raise TypeError(errmsg.format(type(samples).__name__))
+        self._samples = [zlib.decompress(s).decode() for s in samples]
+
     
-    def to_df(self, motif, threshold, qvalt, recomb, ignore_qvals=False):
+    def to_df(self, motif, threshold, qvalt, recomb, ignore_qvals=False, samples=False):
         if not isinstance(motif, Motif):
             errmsg = "\n\nERROR: Expected Motif, got {}.\n"
             raise TypeError(errmsg.format(type(motif).__name__))
@@ -257,6 +268,9 @@ class ResultTmp(object):
         if not isinstance(ignore_qvals, bool):
             errmsg = "\n\nERROR: Expected bool, got {}.\n"
             raise TypeError(errmsg.format(type(ignore_qvals).__name__))
+        if not isinstance(samples, bool):
+            errmsg = "\n\nERROR: Expected bool, got {}.\n"
+            raise TypeError(errmsg.format(type(samples).__name__))
         
         if qvalt: assert bool(self._qvalues) and not ignore_qvals
         if ignore_qvals:
@@ -292,6 +306,10 @@ class ResultTmp(object):
                     "reference":self.references
                 }
             )
+        # add samples if required
+        if samples:
+            assert bool(self._samples) 
+            df["samples"] = self.samples
         # apply threshold
         if qvalt:
             assert bool(self.qvalues)
@@ -415,6 +433,17 @@ class ResultTmp(object):
     @property
     def qvalues(self):
         return self._get_qvalues()
+
+
+    def _get_samples(self):
+        if not self._samples:
+            errmsg = "\"self._samples\" is empty.\n"
+            raise AttributeError(errmsg)
+        return self._samples
+
+    @property
+    def samples(self):
+        return self._get_samples()
 
 
     def _get_frequencies(self):

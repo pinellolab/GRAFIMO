@@ -433,6 +433,8 @@ class Findmotif(Workflow):
             raise TypeError(errmsg.format("int", type(args.cores).__name__))
         if not isinstance(args.recomb, bool):
             raise TypeError(errmsg.format("bool", type(args.recomb).__name__))
+        if not isinstance(args.track_samples, bool):
+            raise TypeError(errmsg.format("bool", type(args.track_samples).__name__))
         if not isinstance(args.top_graphs, int):
             raise TypeError(errmsg.format("int", type(args.top_graphs).__name__))
         if not isinstance(args.no_qvalue, bool):
@@ -468,6 +470,7 @@ class Findmotif(Workflow):
         self._thresh = args.threshold
         self._cores = args.cores
         self._outdir = args.out
+        self._track_samples = args.track_samples
         self._recomb = args.recomb
         self._top_graphs = args.top_graphs
         self._no_qvalue = args.no_qvalue
@@ -620,6 +623,14 @@ class Findmotif(Workflow):
     @property
     def recomb(self):
         return self._get_recomb()
+
+
+    def _get_tracksamples(self):
+        return self._track_samples
+
+    @property
+    def tracksamples(self):
+        return self._get_tracksamples()
 
 
     def _get_top_graphs(self) -> int:

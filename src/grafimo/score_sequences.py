@@ -17,8 +17,7 @@ The running time of the algorithm used is bounded by O(n^2).
 from grafimo.motif import Motif
 from grafimo.workflow import Findmotif
 from grafimo.resultsTmp import ResultTmp
-from grafimo.GRAFIMOException import WrongPathException, ValueException, \
-    SubprocessError
+from grafimo.GRAFIMOException import SubprocessError
 from grafimo.utils import die, printProgressBar, sigint_handler, exception_handler
 
 from typing import List, Optional, Dict, Tuple
@@ -34,6 +33,7 @@ import subprocess
 import signal
 import time
 import glob
+import zlib
 import sys
 import os
 
@@ -93,6 +93,7 @@ def compute_results(
         qval_t: bool = args_obj.qvalueT
         no_reverse: bool = args_obj.noreverse
         recomb: bool = args_obj.recomb
+        track_samples = args_obj.tracksamples
         verbose: bool = args_obj.verbose
     else:  # pytest - during normal execution we should never go here
         cores = 1
@@ -101,6 +102,7 @@ def compute_results(
         no_qvalue = False
         qval_t = False
         no_reverse = False
+        track_samples = False
         verbose = False
     assert threshold > 0 and threshold <= 1
     assert cores >= 1
@@ -127,8 +129,8 @@ def compute_results(
         for i in range(cores):
             p = mp.Process(
                 target=score_seqs, args=(
-                    sequences_split[i], motif, no_reverse, return_dict, 
-                    scanned_seqs_dict, scanned_nucs_dict, i, debug
+                    sequences_split[i], motif, no_reverse, track_samples,
+                    return_dict, scanned_seqs_dict, scanned_nucs_dict, i, debug
                 )
             )
             jobs.append(p)
@@ -158,6 +160,7 @@ def compute_results(
     if verbose: start_df: str = time.time()
     # recover all analysis results and summarize them in a single 
     # data structure
+    samples = []
     seqs_scanned: int = 0
     nucs_scanned: int = 0
     summary = ResultTmp()
@@ -170,6 +173,7 @@ def compute_results(
         )
         seqs_scanned += scanned_seqs_dict[key]
         nucs_scanned += scanned_nucs_dict[key] 
+        samples += partialres[10]
     if summary.isempty():
         errmsg = "No result retrieved. Unable to proceed. Are you using the correct VGs and searching on the right chromosomes?\n"
         exception_handler(ValueError, errmsg, debug)
@@ -181,10 +185,15 @@ def compute_results(
         if verbose:
             end_q = time.time()
             print("Q-values computed in %.2fs." % (end_q - start_q))
+    if track_samples:
+        assert len(partialres) == 11  # samples in last list
+        summary.add_samples(samples)
     print("Scanned sequences:\t{}".format(seqs_scanned))
     print("Scanned nucleotides:\t{}".format(nucs_scanned))
     # summarize results in a pandas DataFrame
-    finaldf = summary.to_df(motif, threshold, qval_t, recomb, ignore_qvals=no_qvalue)
+    finaldf = summary.to_df(
+        motif, threshold, qval_t, recomb, ignore_qvals=no_qvalue, samples=track_samples
+    )
     if verbose:
         end_df: float = time.time()
         print("\nResults summary built in %.2fs" % (end_df - start_df))
@@ -198,6 +207,7 @@ def score_seqs(
     sequences: List[str],
     motif: Motif,
     noreverse: bool,
+    track_samples: bool,
     return_dict: DictProxy,
     scanned_seqs_dict: DictProxy,
     scanned_nucs_dict: DictProxy,
@@ -219,6 +229,8 @@ def score_seqs(
         motif object 
     noreverse : bool
         skip reverse strand
+    track_samples : bool
+        recover sample IDs
     return_dict : multiprocessing.managers.DictProxy
         result dictionary
     scanned_seqs_dict : mp.managers.DictProxy
@@ -247,6 +259,7 @@ def score_seqs(
 
         #restmp = ResultTmp()
         restmp = [[], [], [], [], [], [], [], [], [], []]
+        if track_samples: restmp.append([])
         seqs_scanned: int = 0  # counter for scanned sequences 
         for s in sequences:
             ifstream = open(s, mode="r")
@@ -270,6 +283,9 @@ def score_seqs(
                     score, pvalue = compute_score_seq(
                         seq, score_matrix, pval_mat, min_score, scale, width, offset
                     )
+                    if track_samples:
+                        if int(freq) == 0: samples_ids = zlib.compress("No sample".encode("ascii"))
+                        else: samples_ids = zlib.compress(data[7].encode("ascii"))
                     seqs_scanned += 1
                     # fix indel reference report bug
                     distance: int = np.abs(stop - start)
@@ -288,6 +304,7 @@ def score_seqs(
                     restmp[7].append(pvalue)
                     restmp[8].append(int(freq))
                     restmp[9].append(ref)
+                    if track_samples: restmp[10].append(samples_ids)
     except KeyboardInterrupt:
         pass  # handled above
     return_dict[pid] = restmp

@@ -13,9 +13,7 @@ wrapper to call them is provided.
 
 
 from grafimo.utils import DNA_ALPHABET, lg2, RANGE, isListEqual, exception_handler
-from grafimo.GRAFIMOException import NotValidAlphabetException, \
-    FileReadError, NoDataFrameException, NotValidMotifMatrixException, \
-    BGFileError, ScaledScoreMatrixException, MotifProcessingError
+from grafimo.GRAFIMOException import FileReadError, BGFileError, MotifProcessingError
 from grafimo.motif import Motif
 
 from libc.stdlib cimport strtod

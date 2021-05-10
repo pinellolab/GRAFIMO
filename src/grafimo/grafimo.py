@@ -9,6 +9,7 @@ scan a precomputed graph for the occurrences of a given motif.
 
 from grafimo.workflow import BuildVG, Findmotif
 from grafimo.constructVG import construct_vg, indexVG
+from grafimo.GRAFIMOException import VGError
 from grafimo.motif_ops import get_motif_pwm
 from grafimo.motif_set import MotifSet
 from grafimo.extract_regions import scan_graph
@@ -117,6 +118,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         print("\t- Threshold: ", args_obj.threshold)
         print("\t- Output directory: ", args_obj.outdir)
         print("\t- Cores: ", cores)
+        print("\t- Track samples: ", args_obj.tracksamples)
         print("\t- recomb: ", args_obj.recomb)
         print("\t- Top graphs: ", args_obj.top_graphs)
         print("\t- no-qvalue: ", args_obj.noqvalue)
@@ -134,7 +136,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         if args_obj.graph_genome.split('.')[-1] == 'vg':
             warnmsg: str = "\nWARNING: {} is not indexed. To scan a VG, it should be indexed."
             # quick IO with user
-            answer = -1  # ensure we enter while loop
+            answer = str(-1)  # ensure we enter while loop
             while answer.upper() != 'Y' and answer.upper() != 'N':
                 print(warnmsg.format(args_obj.graph_genome))
                 answer: str = input("Do you want to index it now? (y/n)\n")
@@ -148,10 +150,10 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
                 if not os.path.isfile(vcf):
                     errmsg = "Unable to locate {}.\n"
                     exception_handler(FileNotFoundError, errmsg.format(vcf), debug)
-                code: int = indexVG(args_obj.graph_genome, vcf, cores, verbose)  # VG indexing
+                code: int = indexVG(args_obj.graph_genome, vcf, cores, verbose, debug)  # VG indexing
                 if code != 0:
                     errmsg = "An error occurred during {} indexing.\n"
-                    exception_handler(VGException, errmsg.format(args_obj.graph_genome), debug) 
+                    exception_handler(VGError, errmsg.format(args_obj.graph_genome), debug) 
             else:
                 errmsg = "To scan {} are required the XG and GBWT indexes.\n"
                 exception_handler(FileNotFoundError, errmsg.format(args_obj.graph_genome), debug)
@@ -179,7 +181,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         # score sequences
         res: pd.DataFrame = compute_results(mtf, sequence_loc, debug, args_obj)
         # write results
-        if args_obj.text_only: print_results(res)  # print to stdout
+        if args_obj.text_only: print_results(res, debug)  # print to stdout
         else: write_results(res, mtf, mtfSet.size, args_obj, debug)
 
 # end of findmotif()

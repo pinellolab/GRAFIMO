@@ -6,9 +6,7 @@ motif information, etc.
 """
 
 
-from grafimo.GRAFIMOException import NotValidMotifMatrixException, \
-    NoDataFrameException, WrongMotifIDException, WrongMotifWidthException, \
-    WrongMotifNameException, NotValidAlphabetException, ValueException
+from grafimo.GRAFIMOException import MotifMatrixError
 from grafimo.utils import isListEqual, DNA_ALPHABET  
 
 from typing import List, Optional, Dict   
@@ -173,7 +171,7 @@ class Motif(object):
             raise TypeError(errmsg.format(type(count_matrix).__name__))
         if count_matrix.size == 0 or sum(sum(count_matrix)) == 0:
             errmsg = "\n\nERROR: Empty motif count matrix.\n"
-            raise NotValidMotifMatrixException(errmsg)
+            raise MotifMatrixError(errmsg)
         if not isinstance(width, int):
             errmsg = "\n\nERROR: Expected int, got {}.\n"
             raise TypeError(errmsg.format(type(width).__name__))

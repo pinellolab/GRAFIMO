@@ -12,9 +12,7 @@ TODO: manage TRANSFAC and PFM motif formats.
 """
 
 
-from grafimo.GRAFIMOException import NoDataFrameException, ValueException, \
-    NotValidMotifMatrixException, BGFileError, MotifFileReadError, \
-    NotValidAlphabetException, NotValidFFException, MotifFileFormatError
+from grafimo.GRAFIMOException import BGFileError, MotifFileReadError, MotifFileFormatError
 from grafimo.utils import die, DNA_ALPHABET, REV_COMPL, PSEUDObg, isListEqual,\
      isJaspar_ff, isMEME_ff, almost_equal, RANGE, printProgressBar, \
      sigint_handler, exception_handler, UNIF

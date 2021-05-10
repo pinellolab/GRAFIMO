@@ -22,9 +22,10 @@ space on disk and save memory when scanning it.
 
 from grafimo.utils import die, sigint_handler, ALL_CHROMS, exception_handler
 from grafimo.workflow import BuildVG
-from grafimo.GRAFIMOException import VGError, ValueException, \
-    SubprocessError, FileReadError
+from grafimo.GRAFIMOException import VGError, SubprocessError, FileReadError
+
 from typing import List, Dict
+
 import subprocess
 import signal
 import time
