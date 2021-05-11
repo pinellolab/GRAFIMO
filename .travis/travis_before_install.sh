@@ -1,17 +1,8 @@
 #!/bin/bash
 
-# Install external dependendecies required to run GRAFIMO:
-# - vg
-# - tabix
-# - graphviz
+# install minoconda Linux x86_64
+apt-get install curl
+curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+chmod +x Miniconda3-latest-Linux-x86_64.sh
+./Miniconda3-latest-Linux-x86_64.sh -b -p "${HOME}/miniconda"
 
-mkdir vg
-cd vg
-wget https://github.com/vgteam/vg/releases/download/v1.27.1/vg
-chmod +x ./vg
-vgpath=`pwd`
-export PATH=$vgpath:$PATH 
-cd ..
-
-#sudo apt-get install tabix
-#sudo apt-get install graphviz
