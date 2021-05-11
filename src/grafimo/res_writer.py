@@ -133,12 +133,16 @@ def write_results(
         print("%s.gff written in %.2fs" % (prefix, (end_gff - start_gff)))
     # get the graphs of the top n regions
     if top_graphs > 0:
-        regions = set(results["sequence_name"].tolist()[:top_graphs])
+        regions = set()
+        for r in results["sequence_name"].tolist():
+            if len(regions) >= top_graphs: break  # abort loop
+            regions.add(r)  # avoid repeated regions
+        # regions = set(results["sequence_name"].tolist()[:top_graphs])
         if len(regions) == 0:
             errmsg = "No region obtained, the results seems to be empty.\n"
             exception_handler(ValueError, errmsg, debug)
         if len(regions) < top_graphs:
-            warnmsg = "WARNING: requested %d regions, obtaned %d.\n"
+            warnmsg = "WARNING: requested %d regions, obtained %d.\n"
             print(warnmsg % (top_graphs, len(regions)))
         if verbose:
             print("Extracting %d region variation graphs" % len(regions))
@@ -158,8 +162,20 @@ def write_results(
         print("Writing the top %d graphs in %s\n" % (len(regions), image_dir))
         try:
             for r in regions:
-                if verbose: print("Computing the PNG image of {}".format(region))
-                get_region_graph(region, vg)
+                if verbose: print("Computing the PNG image of {}".format(r))
+                if args_obj.has_graphgenome():
+                    get_region_graph(
+                        r, args_obj.chroms_prefix, args_obj.namemap,
+                        debug, graph_genome=args_obj.graph_genome
+                    )
+                elif args_obj.has_graphgenome_dir():
+                    get_region_graph(
+                        r, args_obj.chroms_prefix, args_obj.namemap,
+                        debug, graph_genome_dir=args_obj.graph_genome_dir
+                    )
+                else:
+                    errmsg = "Unknown VG type. Unable to print regions PNG images.\n"
+                    exception_handler(ValueError, errmsg, debug)
         except:
             errmsg = "An error occurred while computing PNG image of {}.\n"
             exception_handler(VGError, errmsg.format(r), debug)
@@ -343,7 +359,7 @@ def get_region_graph(
         errmsg = "An error occurred while executing {}.\n"
         exception_handler(SubprocessError, errmsg.format(cmd), debug)
     pngimage = ".".join([region, "png"])
-    cmd = "dor -Tpng {} -o {}".format(dotregion, pngimage)
+    cmd = "dot -Tpng {} -o {}".format(dotregion, pngimage)
     code = subprocess.call(cmd, shell=True)
     if code != 0:
         errmsg = "An error occurred while executing {}.\n"
