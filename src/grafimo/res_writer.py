@@ -84,7 +84,7 @@ def write_results(
     top_graphs: int = args_obj.top_graphs
     verbose: bool = args_obj.verbose
     if args_obj.has_graphgenome(): vg = args_obj.graph_genome
-    elif args_obj.has_graphgenome_dir: vg = args_obj.graph_genome_dir
+    elif args_obj.has_graphgenome_dir(): vg = args_obj.graph_genome_dir
     else:
         errmsg = "No genome variation graph given.\n"
         exception_handler(VGError, errmsg, debug)
@@ -127,18 +127,22 @@ def write_results(
         print("%s.html written in %.2fs" % (prefix, (end_html - start_html)))
         start_gff: float = time.time()
     # write the GFF3
-    writeGFF3(prefix, results, no_qvalue, debug)
+    writeGFF3(prefix, results, no_qvalue, args_obj.tracksamples, debug)
     if verbose:
         end_gff: float = time.time()
         print("%s.gff written in %.2fs" % (prefix, (end_gff - start_gff)))
     # get the graphs of the top n regions
     if top_graphs > 0:
-        regions = set(results["sequence_name"].tolist()[:top_graphs])
+        regions = set()
+        for r in results["sequence_name"].tolist():
+            if len(regions) >= top_graphs: break
+            regions.add(r)
+        #regions = set(results["sequence_name"].tolist()[:top_graphs])
         if len(regions) == 0:
             errmsg = "No region obtained, the results seems to be empty.\n"
             exception_handler(ValueError, errmsg, debug)
         if len(regions) < top_graphs:
-            warnmsg = "WARNING: requested %d regions, obtaned %d.\n"
+            warnmsg = "WARNING: requested %d regions, obtained %d.\n"
             print(warnmsg % (top_graphs, len(regions)))
         if verbose:
             print("Extracting %d region variation graphs" % len(regions))
@@ -158,8 +162,20 @@ def write_results(
         print("Writing the top %d graphs in %s\n" % (len(regions), image_dir))
         try:
             for r in regions:
-                if verbose: print("Computing the PNG image of {}".format(region))
-                get_region_graph(region, vg)
+                if verbose: print("Computing the PNG image of {}".format(r))
+                if args_obj.has_graphgenome():
+                    get_region_graph(
+                        r, args_obj.chroms_prefix, args_obj.namemap, 
+                        debug, graph_genome=args_obj.graph_genome 
+                    )
+                elif args_obj.has_graphgenome_dir():
+                    get_region_graph(
+                        r, args_obj.chroms_prefix, args_obj.namemap,
+                        debug, graph_genome_dir= args_obj.graph_genome_dir
+                    )
+                else:
+                    errmsg = "Unable to guess VG type.\n"
+                    exception_handler(ValueError, errmsg, debug)
         except:
             errmsg = "An error occurred while computing PNG image of {}.\n"
             exception_handler(VGError, errmsg.format(r), debug)
@@ -168,7 +184,13 @@ def write_results(
 # end of write_results()
 
 
-def writeGFF3(prefix: str, data: pd.DataFrame, no_qvalue: bool, debug: bool) -> None:
+def writeGFF3(
+    prefix: str, 
+    data: pd.DataFrame, 
+    no_qvalue: bool,
+    track_samples: bool, 
+    debug: bool
+) -> None:
     """Write GFF3 file (https://www.ensembl.org/info/website/upload/gff3.html). 
     
     The GFF3 file annotates the potential motf occurrences found by GRAFIMO. The
@@ -185,6 +207,8 @@ def writeGFF3(prefix: str, data: pd.DataFrame, no_qvalue: bool, debug: bool) -> 
         analysis results
     no_qvalue : bool
         ignore q-values
+    track_samples : bool
+        sample tracking required
     debug : bool
         trace the full error stack
     """
@@ -198,8 +222,11 @@ def writeGFF3(prefix: str, data: pd.DataFrame, no_qvalue: bool, debug: bool) -> 
     if not isinstance(no_qvalue, bool):
         errmsg = "Expected bool, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(no_qvalue).__name__), debug)
+    if not isinstance(track_samples, bool):
+        errmsg = "Expected bool, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(track_samples).__name__), debug)
 
-    data_list = dftolist(data, no_qvalue, debug)
+    data_list = dftolist(data, no_qvalue, track_samples, debug)
     try:
         gfffn = ".".join([prefix, "gff"])
         ofstream = open(gfffn, mode='w+')
@@ -343,7 +370,7 @@ def get_region_graph(
         errmsg = "An error occurred while executing {}.\n"
         exception_handler(SubprocessError, errmsg.format(cmd), debug)
     pngimage = ".".join([region, "png"])
-    cmd = "dor -Tpng {} -o {}".format(dotregion, pngimage)
+    cmd = "dot -Tpng {} -o {}".format(dotregion, pngimage)
     code = subprocess.call(cmd, shell=True)
     if code != 0:
         errmsg = "An error occurred while executing {}.\n"

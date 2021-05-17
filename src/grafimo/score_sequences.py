@@ -18,11 +18,25 @@ from grafimo.motif import Motif
 from grafimo.workflow import Findmotif
 from grafimo.resultsTmp import ResultTmp
 from grafimo.GRAFIMOException import SubprocessError
-from grafimo.utils import die, printProgressBar, sigint_handler, exception_handler
+from grafimo.utils import (
+    die, 
+    printProgressBar, 
+    sigint_handler, 
+    exception_handler,
+    parse_samples
+)
 
-from typing import List, Optional, Dict, Tuple
+from typing import (
+    List, 
+    Optional, 
+    Dict, 
+    Tuple
+)
 from statsmodels.stats.multitest import multipletests
-from multiprocessing.managers import DictProxy, SyncManager
+from multiprocessing.managers import (
+    DictProxy, 
+    SyncManager
+)
 from numba import jit
 
 import multiprocessing as mp
@@ -173,7 +187,7 @@ def compute_results(
         )
         seqs_scanned += scanned_seqs_dict[key]
         nucs_scanned += scanned_nucs_dict[key] 
-        samples += partialres[10]
+        if track_samples: samples += partialres[10]
     if summary.isempty():
         errmsg = "No result retrieved. Unable to proceed. Are you using the correct VGs and searching on the right chromosomes?\n"
         exception_handler(ValueError, errmsg, debug)
@@ -285,7 +299,10 @@ def score_seqs(
                     )
                     if track_samples:
                         if int(freq) == 0: samples_ids = zlib.compress("No sample".encode("ascii"))
-                        else: samples_ids = zlib.compress(data[7].encode("ascii"))
+                        else: 
+                            samples_ids = zlib.compress(
+                                parse_samples(data[7], debug).encode("ascii")
+                            )
                     seqs_scanned += 1
                     # fix indel reference report bug
                     distance: int = np.abs(stop - start)

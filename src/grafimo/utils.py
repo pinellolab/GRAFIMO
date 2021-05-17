@@ -359,6 +359,7 @@ def lg2(value: np.double) -> np.double:
         value
         
     Returns
+    -------
     np.double
         log2 of the input value
     """
@@ -368,8 +369,41 @@ def lg2(value: np.double) -> np.double:
 
 # end of lg2()
 
+def parse_samples(samples_list, debug):
+    """Parse samples list to retrieve their IDs.
 
-def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
+    Parameters
+    -----------
+    samples_list : str
+        samples list (ID + phase)
+    
+    Returns
+    -------
+    str
+    """
+    
+    if not isinstance(samples_list, str):
+        errmsg = "Expected str, got {}.\n"
+        exception_handler(
+            TypeError, errmsg.format(type(samples_list).__name__), debug
+        )
+    sids = []
+    samples_idsphases = samples_list.strip().split(",")[:-1]  # ids separated by commas
+    for s in samples_idsphases: 
+        assert isinstance(s, str)
+        sids.append(s.split("#")[0])
+    sids = list(set(sids))
+    # create final string
+    samplesids = ",".join(sids)
+    return samplesids
+
+
+def dftolist(
+    data: pd.DataFrame, 
+    no_qvalue: bool,
+    track_samples: bool, 
+    debug: bool
+) -> List:
     """Convert pandas DataFrame in a list of lists.
 
     ...
@@ -380,6 +414,8 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
         DataFrame
     no_qvalue : bool
         skip q-values
+    track_samples:
+        sample tracking required
     debug : bool
         trace the full error stack
 
@@ -395,9 +431,14 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
     if len(data) == 0:
         errmsg = "Empty DataFrames cannot be converted to lists of values.\n"
         exception_handler(ValueError, errmsg, debug)
-    if len(data.columns) > 12 or len(data.columns) < 11:
-        errmsg = "Not enough values to extract from the DataFrame.\n"
-        exception_handler(ValueError, errmsg, debug)
+    if not track_samples:
+        if len(data.columns) > 12 or len(data.columns) < 11:
+            errmsg = "Not enough/too much values to extract from the DataFrame.\n"
+            exception_handler(ValueError, errmsg, debug)
+    else:  # track_samples == True
+        if len(data.columns) > 13 or len(data.columns) < 12:
+            errmsg = "Not enough/too much values to extract from the DataFrame.\n"
+            exception_handler(ValueError, errmsg, debug)
     if not isinstance(no_qvalue, bool):
         errmsg = "Expected bool, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(no_qvalue).__name__), debug)
