@@ -25,7 +25,7 @@ import os
 
 
 # version of GRAFIMO
-__version__ = '1.1.4'
+__version__ = '1.1.5'
 
 
 sys.excepthook = exception_handler
