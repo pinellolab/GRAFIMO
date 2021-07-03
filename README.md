@@ -277,6 +277,10 @@ Guo, Yu Amanda, et al. "Mutation hotspots at CTCF binding sites coupled to chrom
 
 Garrison, Erik, et al. "Variation graph toolkit improves read mapping by representing genetic variation in the reference." *Nature biotechnology* 36.9 (2018): 875-879.
 
+## How to reproduce the experiments
+
+All the scripts and IPython notebooks required to reproduce the experiments and the analysis presented in GRAFIMO's paper are available [here](https://github.com/pinellolab/GRAFIMO/tree/master/docs/paper_results).
+
 ## Citation
 
 If you use GRAFIMO in your research, please cite us:
