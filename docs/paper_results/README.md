@@ -12,7 +12,9 @@ The current directory contains the data and shell scripts to reproduce the analy
 
 **1.** The first step is to download the pangenome variation graphs (VGs) we used during the GRAFIMO analysis. We created the VGs by enriching the hg38 reference genome with genetic variants (SNPs and indels) of 2548 individuals from the 1000 Genomes Project (1000GP).
 
-To downoad the VGs, type
+**NB** Our analysis were carried out with VG v1.31.0
+
+To download the VGs, type
 ```
 bash get_vgs.sh
 ```
@@ -44,3 +46,18 @@ cat /path/to/BED_filt.bed | sort -rk9 | head -n3000 > /path/to/BED_3000.bed
 ```
 
 **3.** Once the analysis is completed, we can reproduce the results presented in the paper by running ```grafimo_results_analysis.ipynb``` IPython Notebook.
+
+## Reproducing population specific binding site analysis
+
+To reproduce the analysis on the fraction of population specific binding sites recovered only on individual haplotypes are required: 
+
+- GRAFIMO v1.1.5 (still in alpha) available [here](https://github.com/pinellolab/GRAFIMO/tree/track-samples)
+
+- VG v1.32.1 or later
+
+Once the requirements have been satisfied, the search can start (it will take a while):
+```
+bash run_analysis_pop.sh
+```
+
+Once the search has been completed, the analysis can be reproduced by running the IPython notebook ```population_specific_bs.ipynb```.
