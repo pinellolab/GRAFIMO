@@ -412,9 +412,9 @@ def print_results(results: pd.DataFrame, debug: bool):
         errmsg = "Expected pandas.DataFrame, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(results).__name__), debug)
 
-    # little hack in pd df parameters to avoid the weird default
-    # print of a DataFrame (cut the majority of lines)
+    # little hack on pd parameters to display all TSV columns and rows 
     pd.set_option("display.max_rows", len(results))
+    pd.set_option("display.max_columns", None)  # ensure all cols
     print()  # newline
     print(results)
     pd.reset_option("display.max_rows")
