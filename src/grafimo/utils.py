@@ -238,9 +238,22 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
     ff = motif_file.split(".")[-1]
-    if ff == "jaspar":
-        return True
-    return False
+    if ff != "jaspar":
+        return False
+    ifstream = open(motif_file, mode="r")
+    header = ifstream.readline().strip()
+    if not header.startswith(">"):  # probably not JASPAR
+        return False
+    while True:
+        line = ifstream.readline()
+        line = line.strip().split()
+        if not line: break  # EOF or empty file?
+        if not line[1] == "[" and line[-1] == "]":
+            return False  # surely not JASPAR
+        counts = line[2:-1]
+        if any([not is_number(c, debug) for c in counts]):
+            return False
+    return True
 
 # end of isJaspar_ff()
 
@@ -277,6 +290,27 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
     return False  # no MEME version found --> improper input
 
 # end of isMEME_ff()
+
+
+def isPFM_ff(motif_file: str, debug: bool) -> bool:
+
+    if not isinstance(motif_file, str):
+        errmsg = "\n\nERROR: Expected str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(motif_file).__name), debug)
+    if not os.path.isfile(motif_file):
+        errmsg = "\n\nERROR: Unable to locate {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
+    if os.stat(motif_file).st_size == 0:
+        errmsg = "\n\nERROR: {} seems to be empty.\n"
+        exception_handler(EOFError, errmsg.format(motif_file), debug)
+
+    ifstream = open(motif_file, mode="r")
+    for line in ifstream:
+        if line.startswith(">"): continue  # probably from JASPAR
+        counts = line.strip().split()
+        if any([not is_number(c, debug) for c in counts]):
+            return False
+    return True
 
 
 def isbed(bedfile: str, debug: bool) -> bool:
@@ -430,6 +464,36 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
     return summary
 
 # end of dftolist()
+
+
+def is_number(s: str, debug: bool) -> bool:
+    """Check wheter a string contains float values.
+
+    ...
+
+    Parameters
+    ----------
+    s : str
+        string object
+    debug : bool
+        trace the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(s, str):
+        errmsg = "\n\nExpected str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(s).__name__), debug)
+    
+    try: 
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+# end of is_number()
 
 
 def printProgressBar(

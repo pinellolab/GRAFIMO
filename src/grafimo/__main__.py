@@ -84,13 +84,39 @@ See https://github.com/pinellolab/GRAFIMO/wiki or https://github.com/InfOmics/GR
 
 
 from grafimo.GRAFIMOArgumentParser import GRAFIMOArgumentParser
-from grafimo.workflow import BuildVG, Findmotif
-from grafimo.utils import die, initialize_chroms_list, isJaspar_ff, isMEME_ff, \
-    check_deps, sigint_handler, EXT_DEPS, CHROMS_LIST, DEFAULT_OUTDIR, NOMAP, ALL_CHROMS, anydup, exception_handler, UNIF, isbed
-from grafimo.grafimo import __version__, buildvg, findmotif
+from grafimo.workflow import (
+    BuildVG, 
+    Findmotif
+)
+from grafimo.utils import (
+    die, 
+    initialize_chroms_list, 
+    isJaspar_ff, 
+    isMEME_ff, 
+    isPFM_ff,
+    isbed,
+    check_deps,
+    anydup, 
+    sigint_handler,
+    exception_handler, 
+    EXT_DEPS, 
+    CHROMS_LIST, 
+    DEFAULT_OUTDIR, 
+    NOMAP, 
+    ALL_CHROMS, 
+    UNIF
+)
+from grafimo.grafimo import (
+    __version__, 
+    buildvg, 
+    findmotif
+)
 from grafimo.GRAFIMOException import DependencyError
 
-from typing import List, Optional
+from typing import (
+    List, 
+    Optional
+)
 from glob import glob
 
 import multiprocessing as mp
@@ -558,14 +584,18 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
                 else:
                     motifs: List[str] = args.motif
                     for m in motifs:
-                        if not isMEME_ff(m, args.debug) and not isJaspar_ff(m, args.debug):
-                            parser.error(
-                                "Unrecognized motif PWM file format. "
-                                "{} does not follow the MEME or JASPAR format rules".format(m)
-                            )
-                            die(1)
                         if not os.path.isfile(m):
                             parser.error("Unable to locate {}".format(m))
+                        if (not isMEME_ff(m, args.debug) and 
+                            not isJaspar_ff(m, args.debug) and
+                            not isPFM_ff(m, args.debug)
+                        ):
+                            parser.error(
+                                "Unrecognized motif PWM file format. "
+                                "{} does not follow MEME, JASPAR, PFM "
+                                "motif format rules".format(m)
+                            )
+                            die(1)
 
                 # background file
                 if args.bgfile != UNIF:

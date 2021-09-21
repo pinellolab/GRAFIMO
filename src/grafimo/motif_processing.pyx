@@ -196,7 +196,7 @@ def get_uniformBG(alphabet: List[str], debug: bool) -> Dict:
 
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar(
+cdef capply_pseudocount_jaspar_pfm(
     counts_matrix, 
     probs_matrix, 
     double pseudocount, 
@@ -297,10 +297,10 @@ cdef capply_pseudocount_jaspar(
     assert sum(sum(proc_matrix)) != 0
     return proc_matrix
 
-# end capply_pseudocount_jaspar()
+# end capply_pseudocount_jaspar_pfm()
 
 
-def apply_pseudocount_jaspar(
+def apply_pseudocount_jaspar_pfm(
     counts_matrix: pd.DataFrame, 
     probs_matrix: pd.DataFrame, 
     pseudocount: np.double, 
@@ -310,7 +310,7 @@ def apply_pseudocount_jaspar(
     nucsmap: Dict,
     debug: bool
 ) -> np.ndarray:
-    """Python wrapper for capply_pseudocount_jaspar() function.
+    """Python wrapper for capply_pseudocount_jaspar_pfm() function.
     
     Apply pseudocount value to motif counts matrix. The motif PWM is given in
     JASPAR file format.
@@ -342,7 +342,7 @@ def apply_pseudocount_jaspar(
         processed motif probability matrix
     """
 
-    return capply_pseudocount_jaspar(
+    return capply_pseudocount_jaspar_pfm(
         counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, 
         nucsmap, debug
     )
