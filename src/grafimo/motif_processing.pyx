@@ -12,15 +12,26 @@ wrapper to call them is provided.
 """
 
 
-from grafimo.utils import DNA_ALPHABET, lg2, RANGE, isListEqual, exception_handler
-from grafimo.GRAFIMOException import NotValidAlphabetException, \
-    FileReadError, NoDataFrameException, NotValidMotifMatrixException, \
-    BGFileError, ScaledScoreMatrixException, MotifProcessingError
+from grafimo.utils import (
+    lg2, 
+    isListEqual, 
+    exception_handler,
+    DNA_ALPHABET, 
+    RANGE
+) 
+from grafimo.GRAFIMOException import (
+    BGFileError, 
+    MotifProcessingError
+)
+from typing import (
+    List, 
+    Dict, 
+    Set, 
+    Optional
+)
 from grafimo.motif import Motif
 
 from libc.stdlib cimport strtod
-
-from typing import List, Dict, Set, Optional
 
 import pandas as pd
 import numpy as np
@@ -28,7 +39,7 @@ import numpy as np
 import os
 
 
-#-------------------------- read the background file --------------------------#
+#-------------------------- read background file --------------------------#
 cdef creadBGFile(bg_file, debug):
     """Read the background probabilties file. The background file must store the 
     probability for eachnucleotide (A, C, G, T).

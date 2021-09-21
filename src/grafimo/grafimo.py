@@ -15,13 +15,14 @@ from grafimo.constructVG import (
     construct_vg, 
     indexVG
 )
-from grafimo.motif_ops import get_motif_pwm
-from grafimo.motif_set import MotifSet
-from grafimo.extract_regions import scan_graph
 from grafimo.res_writer import (
     print_results, 
     write_results
 )
+from grafimo.motif_ops import get_motif_pwm
+from grafimo.motif_set import MotifSet
+from grafimo.extract_regions import scan_graph
+
 from grafimo.score_sequences import compute_results
 from grafimo.utils import exception_handler, isMEME_ff, isJaspar_ff, isPFM_ff  # TODO: remove
 

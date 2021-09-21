@@ -16,14 +16,30 @@ option. In this case the sample haplotypes are ignored.
 """
 
 
-from grafimo.GRAFIMOException import SubprocessError, NotValidFFException, \
-    FileReadError, VGError, FileFormatError
-from grafimo.utils import die, ALL_CHROMS, printProgressBar, sigint_handler, exception_handler, NOMAP, isbed
+from grafimo.GRAFIMOException import  (
+    FileReadError, 
+    VGError, 
+    FileFormatError
+)
+from grafimo.utils import (
+    die, 
+    printProgressBar, 
+    sigint_handler, 
+    exception_handler, 
+    isbed, 
+    ALL_CHROMS,  
+    NOMAP
+) 
 from grafimo.score_sequences import ResultTmp
 from grafimo.workflow import Findmotif
 from grafimo.motif import Motif
 
-from typing import List, Optional, Dict, Tuple
+from typing import (
+    List, 
+    Optional, 
+    Dict, 
+    Tuple
+)
 
 import multiprocessing as mp
 

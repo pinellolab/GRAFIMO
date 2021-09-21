@@ -14,16 +14,28 @@ The running time of the algorithm used is bounded by O(n^2).
 """
 
 
-from grafimo.motif import Motif
-from grafimo.workflow import Findmotif
+from grafimo.utils import (
+    die, 
+    printProgressBar, 
+    sigint_handler, 
+    exception_handler
+)
+from grafimo.GRAFIMOException import SubprocessError
 from grafimo.resultsTmp import ResultTmp
-from grafimo.GRAFIMOException import WrongPathException, ValueException, \
-    SubprocessError
-from grafimo.utils import die, printProgressBar, sigint_handler, exception_handler
+from grafimo.workflow import Findmotif
+from grafimo.motif import Motif
 
-from typing import List, Optional, Dict, Tuple
+from typing import (
+    List, 
+    Optional, 
+    Dict, 
+    Tuple
+)
 from statsmodels.stats.multitest import multipletests
-from multiprocessing.managers import DictProxy, SyncManager
+from multiprocessing.managers import (
+    DictProxy, 
+    SyncManager
+)
 from numba import jit
 
 import multiprocessing as mp

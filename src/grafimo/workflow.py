@@ -9,7 +9,11 @@ all the arguments needed while executing the two operations.
 """
 
 from grafimo.utils import parse_namemap
-from typing import List, Dict
+
+from typing import (
+    List, 
+    Dict
+)
 from argparse import Namespace
 
 

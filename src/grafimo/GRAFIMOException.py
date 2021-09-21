@@ -72,100 +72,15 @@ class MotifProcessingError(GRAFIMOException):
     pass
 
 
-# ------------------------------------------------------------------------------
-class NoDataFrameException(GRAFIMOException):
-    """Raise when a given object is not an instance of pandas.DataFrame
-    type
+class MotifMatrixError(GRAFIMOException):
+    """Raise when errors occurred during motif matrix initialization
     """
-
-    pass
-
-
-class WrongMotifWidthException(GRAFIMOException):
-    """Raise when the motif is initialized with a not valid width, such 
-    as negative or floating point measure
-    """
-
-    pass
-
-
-class WrongMotifIDException(GRAFIMOException):
-    """Raise when the motif object is initialized with a wrong motif 
-    ID
-    """
-
-    pass
-
-
-class WrongMotifNameException(GRAFIMOException):
-    """Raise when the motif object is initialized with a wrong motif 
-    name
-    """
-
-    pass
-
-
-class NotValidMotifMatrixException(GRAFIMOException):
-    """Raise when the motif object is initialized with a not valid motif 
-    matrix
-    """
-
-    pass
-
-
-
-
-
-class NotValidAlphabetException(GRAFIMOException):
-    """Raise when a not valid DNA alphabet is given
-    """
-
-    pass
-
-
-class NotValidFFException(GRAFIMOException):
-    """Raise if the current file has a not allowed file format
-    """
-
-    pass
-
-
-
-
-
-class ValueException(GRAFIMOException):
-    """Raise when a wrong value type is given
-    """
-    
-    pass
-
-
-class ScaledScoreMatrixException(GRAFIMOException):
-    """Raise errors happens computing or loading the scaled score matrix 
-    of the motif
-    """
-
-    pass
-
-
-class WrongPathException(GRAFIMOException):
-    """Raise if is given a wrong path
-    """
-
     pass
 
 
 class SubprocessError(GRAFIMOException):
     """Raise if a subprocess call returned an exit status different 
     from 0 (an error occurred)
-    """
-
-    pass
-
-
-class PipelineException(GRAFIMOException):
-    """Raise when an errors are encountered during the pipeline choice 
-    or initialization
     """
 
     pass

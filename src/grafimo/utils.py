@@ -1,12 +1,20 @@
 """Functions and constant variables used in GRAFIMO code"""
 
-
-from grafimo.GRAFIMOException import NoDataFrameException
-from colorama import Fore, init 
-from typing import List, Optional, Tuple, Dict
+from typing import (
+    List, 
+    Optional, 
+    Tuple, 
+    Dict
+)
+from colorama import (
+    Fore, 
+    init
+) 
 from shutil import which
+
 import pandas as pd
 import numpy as np
+
 import gzip
 import sys
 import os

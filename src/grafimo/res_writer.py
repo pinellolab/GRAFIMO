@@ -13,13 +13,28 @@ The results are stored in three different files:
     through GRAFIMO analysis
 """
 
-from grafimo.GRAFIMOException import VGError, SubprocessError, FileWriteError
-from grafimo.utils import PHASE, TP, SOURCE, dftolist, die, \
-    DEFAULT_OUTDIR, exception_handler
+from grafimo.GRAFIMOException import (
+    VGError, 
+    SubprocessError, 
+    FileWriteError
+)
+from grafimo.utils import (
+    dftolist, 
+    die,
+    exception_handler,
+    PHASE, 
+    TP, 
+    SOURCE,
+    DEFAULT_OUTDIR
+)
 from grafimo.workflow import Findmotif
 from grafimo.motif import Motif
 
-from typing import List, Dict, Optional
+from typing import (
+    List, 
+    Dict, 
+    Optional
+)
 
 import pandas as pd
 import numpy as np

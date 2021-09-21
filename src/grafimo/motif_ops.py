@@ -760,10 +760,9 @@ def read_PFM_motif(
         if readlines < 2:  # too few lines read
             errmsg = "{} seems to be empty or there are missing data.\n"
             exception_handler(IOError, errmsg.format(motif_file), debug)
-    except Exception as e:
+    except:
         errmsg = "An error occurred while reading {}.\n"
-        raise e
-        #exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
+        exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
     else:
         assert len(counts) == 4
         if any([len(c) != len(counts[0]) for c in counts[1:]]):
