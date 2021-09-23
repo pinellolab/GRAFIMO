@@ -37,6 +37,10 @@ EXT_DEPS = ['tabix', 'vg', 'dot']
 SOURCE = 'grafimo'
 TP = 'nucleotide_motif'
 PHASE = '.'
+JASPAR = bin(0)
+MEME = bin(1)
+PFM = bin(3)
+TRANSFAC = bin(4)
 
 
 #-----------------------------------------------------------------------
@@ -236,13 +240,13 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = "\n\nERROR: Expected str, got {}.\n"
+        errmsg = "Expected str, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
     if not os.path.isfile(motif_file):
-        errmsg = "\n\nERROR: Unable to locate {}.\n"
+        errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = "\n\nERROR: {} seems to be empty.\n"
+        errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
     ff = motif_file.split(".")[-1]
@@ -283,13 +287,13 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = "\n\nERROR: Expected str, got {}.\n"
+        errmsg = "Expected str, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
     if not os.path.isfile(motif_file):
-        errmsg = "\n\nERROR: Unable to locate {}.\n"
+        errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = "\n\nERROR: {} seems to be empty.\n"
+        errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
     ifstream = open(motif_file, mode="r")
@@ -301,15 +305,32 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
 
 
 def isPFM_ff(motif_file: str, debug: bool) -> bool:
+    """Check wheter motif files are in PFM format.
+    Assumes that each file contains at most one motif.
+
+    ...
+
+    Parameters
+    ----------
+    motif_file: str
+        motif file
+    debug: bool
+        print the full error stack
+    
+    Returns
+    -------
+    bool
+        check result
+    """
 
     if not isinstance(motif_file, str):
-        errmsg = "\n\nERROR: Expected str, got {}.\n"
+        errmsg = "Expected str, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(motif_file).__name), debug)
     if not os.path.isfile(motif_file):
-        errmsg = "\n\nERROR: Unable to locate {}.\n"
+        errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = "\n\nERROR: {} seems to be empty.\n"
+        errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
     ifstream = open(motif_file, mode="r")
@@ -319,6 +340,77 @@ def isPFM_ff(motif_file: str, debug: bool) -> bool:
         if any([not is_number(c, debug) for c in counts]):
             return False
     return True
+
+
+def isTRANSFAC_ff(motif_file: str, debug: bool) -> bool:
+    """Check wheter motif files are in TRANSFAC format.
+    Assumes that each file contains at most one motif.
+
+    ...
+
+    Parameters
+    ----------
+    motif_file: str
+        motif file
+    debug:
+        print the full error stack
+
+    Returns
+    -------
+    bool
+        check result
+    """
+
+    if not isinstance(motif_file, str):
+        errmsg = "Expected str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
+    if not os.path.isfile(motif_file):
+        errmsg = "Unable to locate {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
+    if os.stat(motif_file).st_size == 0:
+        errmsg = "{} seems to be empty.\n"
+        exception_handler(EOFError, errmsg.format(motif_file), debug)
+
+    transfac_key_fields = {
+        "AC":False,
+        "ID":False,
+        "PO":False,
+
+    }
+    width = 0
+    ifstream = open(motif_file, mode="r")
+    for line in ifstream:
+        line = line.strip()
+        if not line: continue  # empty lines allowed
+        line = line.split(None, 1)
+        key = line[0].strip()
+        if len(key) != 2:
+            return False
+        if len(line) == 2:  # key - value
+            value = line[1].strip()
+            if key in transfac_key_fields.keys():
+                if not value: return False
+                if key in ("P0", "PO"):  # old TRANSFAC files use PO instead of P0
+                    motif_alphabet = value.split()[:4]
+                    if motif_alphabet != DNA_ALPHABET: return False
+                transfac_key_fields[key] = True
+            try:
+                pos = int(key)  # check if counts line
+            except:
+                continue  
+            else:
+                if width == 0 and pos == 0:
+                    return False  # TRANSFAC motif should start from 0
+                width += 1
+                if width != pos: return False  # position mismatch
+    if sum(transfac_key_fields.values()) == 3: return True
+    return False
+            
+            
+
+
+
+    
 
 
 def isbed(bedfile: str, debug: bool) -> bool:

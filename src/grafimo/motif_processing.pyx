@@ -207,7 +207,7 @@ def get_uniformBG(alphabet: List[str], debug: bool) -> Dict:
 
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar_pfm(
+cdef capply_pseudocount_jaspar_pfm_transfac(
     counts_matrix, 
     probs_matrix, 
     double pseudocount, 
@@ -217,8 +217,8 @@ cdef capply_pseudocount_jaspar_pfm(
     nucsmap,
     debug
 ):
-    """Apply pseudocount value to motif counts matrix. The motif PWM is given in
-    JASPAR file format.
+    """Apply pseudocount to motif counts matrix. Input motif should be in 
+    JASPAR, PFM, or TRANSFAC format.
 
     ...
 
@@ -308,10 +308,10 @@ cdef capply_pseudocount_jaspar_pfm(
     assert sum(sum(proc_matrix)) != 0
     return proc_matrix
 
-# end capply_pseudocount_jaspar_pfm()
+# end capply_pseudocount_jaspar_pfm_transfac()
 
 
-def apply_pseudocount_jaspar_pfm(
+def apply_pseudocount_jaspar_pfm_transfac(
     counts_matrix: pd.DataFrame, 
     probs_matrix: pd.DataFrame, 
     pseudocount: np.double, 
@@ -323,8 +323,8 @@ def apply_pseudocount_jaspar_pfm(
 ) -> np.ndarray:
     """Python wrapper for capply_pseudocount_jaspar_pfm() function.
     
-    Apply pseudocount value to motif counts matrix. The motif PWM is given in
-    JASPAR file format.
+    Apply pseudocount to motif counts matrix. Input motif should be in 
+    JASPAR, PFM, or TRANSFAC format.
 
     ...
 
@@ -353,7 +353,7 @@ def apply_pseudocount_jaspar_pfm(
         processed motif probability matrix
     """
 
-    return capply_pseudocount_jaspar_pfm(
+    return capply_pseudocount_jaspar_pfm_transfac(
         counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, 
         nucsmap, debug
     )

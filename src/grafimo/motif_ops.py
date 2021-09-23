@@ -23,6 +23,7 @@ from grafimo.utils import (
     isJaspar_ff, 
     isMEME_ff,
     isPFM_ff, 
+    isTRANSFAC_ff,
     almost_equal,
     sigint_handler, 
     exception_handler,
@@ -31,12 +32,16 @@ from grafimo.utils import (
     REV_COMPL, 
     PSEUDObg, 
     RANGE,
-    UNIF
+    UNIF,
+    JASPAR,
+    MEME,
+    PFM,
+    TRANSFAC
 )
 from motif_processing import (
     readBGfile, 
     get_uniformBG, 
-    apply_pseudocount_jaspar_pfm, 
+    apply_pseudocount_jaspar_pfm_transfac, 
     apply_pseudocount_meme, 
     compute_log_odds, 
     comp_pval_mat
@@ -107,9 +112,6 @@ def build_motif_JASPAR(
     if not os.path.isfile(motif_file):
         errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
-    if not isJaspar_ff(motif_file, debug):
-        errmsg = "Required JASPAR motif PWM parsing, but {} is not in JASPAR format.\n"
-        exception_handler(MotifFileFormatError, errmsg.format(motif_file), debug)
     if not isinstance(bg_file, str):
         errmsg = "Expected str, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(bg_file).__name__), debug)
@@ -227,7 +229,7 @@ def read_JASPAR_motif(
         # motif probability matrix
         motif_probs = (motif_counts / motif_counts.sum(0)) 
         motif_probs = norm_motif(motif_probs, motif_width, alphabet, debug)
-        motif_probs = apply_pseudocount_jaspar_pfm(
+        motif_probs = apply_pseudocount_jaspar_pfm_transfac(
             motif_counts.to_numpy(), motif_probs.to_numpy(), pseudocount, bgs, 
             motif_width, alphabet, nucsmap, debug
         )
@@ -296,9 +298,18 @@ def build_motif_MEME(
     if not os.path.isfile(motif_file):
         errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
-    if not isMEME_ff(motif_file, debug):
-        errmsg = "Required MEME motif PWM parsing, but {} is not in MEME format.\n"
-        exception_handler(MotifFileFormatError, errmsg.format(motif_file), debug)
+    if not isinstance(bg_file, str):
+        errmsg = "Expected str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(bg_file).__name__), debug)
+    if bg_file != UNIF and not os.path.isfile(bg_file):
+        errmsg = "Unable to loacet {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(bg_file), debug)
+    if pseudocount <= 0:
+        errmsg = "Pseudocount must be > 0.\n"
+        exception_handler(ValueError, errmsg, debug)
+    if not isinstance(no_reverse, bool):
+        errmsg = "Expected boll, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(no_reverse).__name__), debug)
 
     if verbose: start_rm_all: float = time.time()
     motif_lst: List[Motif] = read_MEME_motif(
@@ -634,7 +645,7 @@ def build_PFM_motif(
     """Build Motif objects from PFM motif files.
 
     Computes PSSM scoring matrix from counts values stored in the input 
-    PFM file. While computing the PSSM, tyhe function build the 
+    PFM file. While computing the PSSM, the function build the 
     corresponding P-value matrix. The PSSM assigns log-likelihood scores
     to potential motif occurrences, while the P-value matrix computes 
     scores statistical significance. 
@@ -739,7 +750,7 @@ def read_PFM_motif(
         Motif object 
     """
     
-    counts: List[str] = list()
+    counts: List = list()
     motifID = str() 
     motifName = str()
     if verbose: start_rm = time.time()
@@ -751,7 +762,19 @@ def read_PFM_motif(
             line = ifstream.readline().strip()
             if not line: break  # EOF or empty file?
             if line.startswith(">"):  # PFM has header (probably from JASPAR db)
-                motifID, motifName = line[1:].split()
+                header = line[1:].split()
+                if not header:  # no data on header
+                    continue
+                else:
+                    if len(header) == 1:
+                        motifID = header[0]
+                        motifName = motifID
+                    elif len(header) == 2:  # found motif ID and Name
+                        motifID = header[0]
+                        motifName = header[1]
+                    else:  # len(header) > 2
+                        errmsg = "Too much data on header line of {}. Only motif ID and/or Name allowed.\n"
+                        exception_handler(ValueError, errmsg.format(motif_file), debug)
                 continue
             # read counts
             count = list(map(float, line.strip().split()))
@@ -782,7 +805,7 @@ def read_PFM_motif(
         # compute motif probability matrix
         motif_probs = (motif_counts / motif_counts.sum(0))
         motif_probs = norm_motif(motif_probs, motif_width, DNA_ALPHABET, debug)
-        motif_probs = apply_pseudocount_jaspar_pfm(
+        motif_probs = apply_pseudocount_jaspar_pfm_transfac(
             motif_counts.to_numpy(),
             motif_probs.to_numpy(),
             pseudocount,
@@ -810,6 +833,214 @@ def read_PFM_motif(
     return motif
 
 # end of read_PFM_motif()
+
+
+def build_TRANSFAC_motif(
+    motif_file: str,
+    bg_file: str,
+    pseudocount: float,
+    no_reverse: bool,
+    verbose: bool,
+    debug: bool
+) -> Motif:
+    """Build Motif object from TRANSFAC motif files.
+
+    Computes PSSM scoring matrix from counts values stored in TRANSFAC 
+    motif files. While computing the PSSM, the function build the 
+    corresponding P-value matrix. The PSSM assigns log-likelihood scores
+    to potential motif occurrences, while the P-value matrix computes 
+    scores statistical significance. 
+
+    ...
+
+    Parameters
+    ----------
+    motif_file : str
+        path to motif file (TRANSFAC format)
+    bg_file
+        path to background file in Markov Background Format
+        (http://meme-suite.org/doc/bfile-format.html).
+    pseudocount : float
+        value to add to motif PWM counts
+    no_reverse : bool
+        if False, consider only forward strand. Use both strands otherwise.
+    verbose : bool
+        print additional information
+    debug : bool
+        trace the full error stack
+
+    Returns
+    -------
+    Motif
+        Motif object
+    """
+
+    if not isinstance(motif_file, str):
+        errmsg = "Expcted str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
+    if not os.path.isfile(motif_file):
+        errmsg = "Unable to locate {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
+    if not isinstance(bg_file, str):
+        errmsg = "Expected str, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(bg_file).__name__), debug)
+    if bg_file != UNIF and not os.path.isfile(bg_file):
+        errmsg = "Unable to locate {}.\n"
+        exception_handler(FileNotFoundError, errmsg.format(bg_file), debug)
+    if pseudocount <= 0:
+        errmsg = "Pseudocount must be > 0.\n"
+        exception_handler(ValueError, errmsg, debug)
+    if not isinstance(no_reverse, bool):
+        errmsg = "Expected bool, got {}.\n"
+        exception_handler(TypeError, errmsg.format(type(no_reverse).__name__), debug)
+    
+    # parse motif
+    motif: Motif = read_TRANSFAC_motif(
+        motif_file, bg_file, pseudocount, no_reverse, verbose, debug
+    )
+    if verbose: start_mp = time.time()
+    motif = process_motif_for_logodds(motif, debug)
+    if verbose:
+        stop_mp = time.time()
+        msg: str = "Motif %s processed in %.2fs" % (motif.motifID, (stop_mp - start_mp))
+        print(msg)
+    
+    return motif
+
+# end of build build_TRANSFAC_motif()
+
+
+def read_TRANSFAC_motif(
+    motif_file:str,
+    bg_file:str,
+    pseudocount:str,
+    no_reverse:bool,
+    verbose:bool,
+    debug:bool
+) -> Motif:
+    """Read motif TRANSFAC PWMs.
+
+    Parse TRANSFAC motif files. Read data are used to build the motif PSSM,
+    P-value matrix, etc. 
+
+    ...
+
+    Parameters
+    ----------
+    motif_file : str
+        path motif file (TRANSFAC format)
+    bg_file
+        path to background file in Markov Background Format
+        (http://meme-suite.org/doc/bfile-format.html)
+    pseudocount : float
+        value to add to motif PWM counts
+    no_reverse : bool
+        if False, consider only forward strand. Use both strands otherwise
+    verbose : bool
+        print additional information
+    debug:
+        trace the full error stack
+
+    Returns
+    -------
+    Motif
+        Motif object 
+    """
+  
+    counts: Dict = dict()
+    if verbose: start_rm = time.time()
+    try:
+        ifstream = open(motif_file, mode="r")
+        for line in ifstream:
+            line = line.strip()
+            if not line: continue
+            key_value = line.split(None, 1)
+            key = key_value[0].strip()
+            if key == "AC": 
+                assert len(key_value) == 2
+                motifID = key_value[1].strip()
+            elif key == "ID":
+                assert len(key_value) == 2
+                motifName = key_value[1].strip()
+            elif key in ("PO", "P0"):  # old TRANSFAC files use PO instead of P0
+                assert len(key_value) == 2
+                value = key_value[1].strip()
+                nucs = value.split()[:4]
+                assert nucs == DNA_ALPHABET
+                for nuc in nucs: counts[nuc] = []
+                width = 0
+                for line in ifstream:
+                    line = line.strip()
+                    key_value = line.split(None, 1)
+                    key = key_value[0].strip()
+                    try:
+                        pos = int(key)
+                    except ValueError:
+                       break  # matrix completed
+                    if len(key_value) != 2:
+                        errmsg = "Invalid count line in {}.\n"
+                        exception_handler(
+                            ValueError, errmsg.format(motif_file), debug
+                        )
+                    value = key_value[1].strip()
+                    width += 1
+                    if pos != width:
+                        errmsg = "Mismatching motif position and width.\n"
+                        exception_handler(ValueError, errmsg, debug)
+                    values = value.split()[:4]
+                    if len(values) != 4:
+                        errmsg = "TRANSFAC matrix should have count values for each nucloetide.\n"
+                        exception_handler(ValueError, errmsg, debug)
+                    for nuc, v in zip(nucs, values): 
+                        counts[nuc].append(float(v))
+    except:
+        errmsg = "An error occurred while reading {}.\n"
+        exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
+    else:
+        if any([len(counts[DNA_ALPHABET[0]]) != len(counts[nuc]) for nuc in counts.keys()]):
+            errmsg = "Motif counts width mismatch.\n"
+            exception_handler(ValueError, errmsg, debug)
+        nucsmap = dict()
+        for i in range(len(nucs)): nucsmap.update({nucs[i]:i})
+        motif_counts: pd.DataFrame = pd.DataFrame(counts).T
+        motif_width: int = len(counts[DNA_ALPHABET[0]])
+        alphabet:list = sorted(nucs)
+        
+        # compute background
+        if bg_file == UNIF: bgs = get_uniformBG(alphabet, debug)
+        elif os.path.isfile(bg_file): bgs = readBGfile(bg_file, debug)
+        else:
+            errmsg = "Unable to parse {}.\n"
+            exception_handler(BGFileError, errmsg.format(bg_file), debug)
+        bgs = pseudo_bg(bgs, no_reverse, debug)  # add pseudocount to background
+
+        # motif probability matrix
+        motif_probs = (motif_counts / motif_counts.sum(0))
+        motif_probs = norm_motif(motif_probs, motif_width, alphabet, debug)
+        motif_probs = apply_pseudocount_jaspar_pfm_transfac(
+            motif_counts.to_numpy(), 
+            motif_probs.to_numpy(),
+            pseudocount,
+            bgs,
+            motif_width,
+            alphabet,
+            nucsmap,
+            debug
+        )                    
+        motif: Motif = Motif(
+            motif_probs, motif_width, alphabet, motifID, motifName, nucsmap
+        )   
+        motif.setBg(bgs)
+        if verbose:
+            stop_rm = time.time()
+            msg:str = "Read motif %s in %.2fs" % (motifID, (stop_rm - start_rm))
+            print(msg)
+    finally:
+        ifstream.close()
+
+    return motif
+
+# end of read_TRANSFAC_motif()
 
 
 def process_motif_for_logodds(motif: Motif, debug: bool) -> Motif:
@@ -994,38 +1225,46 @@ def get_motif_pwm(motif_file: str,
     pseudo: float = args_obj.pseudo
     no_reverse: bool = args_obj.noreverse
     verbose: bool = args_obj.verbose
-    errmsg: str
+    motifFF: str = str()
     if not isinstance(motif_file, str):
         errmsg = "Expected str, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
     if not os.path.isfile(motif_file):
         errmsg = "Unable to locate {}.\n"
         exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
-    if (
-        (not isMEME_ff(motif_file, debug)) and 
-        (not isJaspar_ff(motif_file, debug)) and
-        (not isPFM_ff(motif_file, debug))
-    ):
-        errmsg = "Motif PWM must be in MEME, JASPAR, or PFM format.\n"
+    if isJaspar_ff(motif_file, debug):
+        motifFF = JASPAR
+    elif isMEME_ff(motif_file, debug):
+        motifFF = MEME
+    elif isPFM_ff(motif_file, debug):
+        motifFF = PFM
+    elif isTRANSFAC_ff(motif_file, debug):
+        motifFF = TRANSFAC
+    else:
+        errmsg = "Motif PWM must be in MEME, JASPAR, PFM, or TRANSFAC format.\n"
         exception_handler(MotifFileFormatError, errmsg, debug)
 
+    assert bool(motifFF)  # should have been assigned FF
     # chhose motif PWM parsing method
-    if isJaspar_ff(motif_file, debug):
+    if motifFF == JASPAR:
         motif = build_motif_JASPAR(
             motif_file, bgs, pseudo, no_reverse, verbose, debug
         )
-    elif isMEME_ff(motif_file, debug):
+    elif motifFF == MEME:
         motif = build_motif_MEME(
             motif_file, bgs, pseudo, no_reverse, cores, verbose, debug
         )
-    elif isPFM_ff(motif_file, debug):
+    elif motifFF == PFM:
         motif = build_PFM_motif(
             motif_file, bgs, pseudo, no_reverse, verbose, debug
         )
-    else:
-        errmsg = "Motif PWM must be in MEME, JASPAR, or PFM format.\n"
+    elif motifFF == TRANSFAC:
+        motif = build_TRANSFAC_motif(
+            motif_file, bgs, pseudo, no_reverse, verbose, debug
+        )
+    else:  # should never reach this point
+        errmsg = "Unrecognized motif file format.\n"
         exception_handler(MotifFileFormatError, errmsg, debug)
-
     # list instance required to proceed    
     if not isinstance(motif, list): motif = [motif]
     assert isinstance(motif, list) 

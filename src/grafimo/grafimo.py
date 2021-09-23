@@ -24,7 +24,7 @@ from grafimo.motif_set import MotifSet
 from grafimo.extract_regions import scan_graph
 
 from grafimo.score_sequences import compute_results
-from grafimo.utils import exception_handler, isMEME_ff, isJaspar_ff, isPFM_ff  # TODO: remove
+from grafimo.utils import exception_handler, isMEME_ff, isJaspar_ff, isPFM_ff, isTRANSFAC_ff  # TODO: remove
 
 import pandas as pd
 
@@ -142,6 +142,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         if isJaspar_ff(mtf, True): print("is JASPAR")
         if isMEME_ff(mtf, True): print("is MEME")
         if isPFM_ff(mtf, True): print("is PFM")
+        if isTRANSFAC_ff(mtf, True): print("is TRANSFAC")
        
     # TODO: remove
 

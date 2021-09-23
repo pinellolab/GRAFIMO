@@ -94,6 +94,7 @@ from grafimo.utils import (
     isJaspar_ff, 
     isMEME_ff, 
     isPFM_ff,
+    isTRANSFAC_ff,
     isbed,
     check_deps,
     anydup, 
@@ -588,11 +589,12 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
                             parser.error("Unable to locate {}".format(m))
                         if (not isMEME_ff(m, args.debug) and 
                             not isJaspar_ff(m, args.debug) and
-                            not isPFM_ff(m, args.debug)
+                            not isPFM_ff(m, args.debug) and
+                            not isTRANSFAC_ff(m, args.debug)
                         ):
                             parser.error(
-                                "Unrecognized motif PWM file format. "
-                                "{} does not follow MEME, JASPAR, PFM "
+                                "Unrecognized motif PWM file format. {} does " 
+                                "not follow MEME, JASPAR, PFM, or TRANSFAC "
                                 "motif format rules".format(m)
                             )
                             die(1)
