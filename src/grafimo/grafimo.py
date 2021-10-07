@@ -143,6 +143,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         if isMEME_ff(mtf, True): print("is MEME")
         if isPFM_ff(mtf, True): print("is PFM")
         if isTRANSFAC_ff(mtf, True): print("is TRANSFAC")
+    sys.exit(3)
        
     # TODO: remove
 

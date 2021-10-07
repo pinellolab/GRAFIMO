@@ -249,22 +249,37 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
         errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
-    ff = motif_file.split(".")[-1]
-    if ff != "jaspar":
+    pwm_row_num = 0
+    try:
+        ifstream = open(motif_file, mode="r")
+        for line in ifstream:
+            if line.startswith(">"):  # JASPAR / idmmpmm
+                continue
+            else:
+                # motif start
+                columns = line.strip().split()
+                if columns[0] in DNA_ALPHABET:
+                    columns = columns[1:]
+                    if not is_number(columns[0], debug):
+                        columns = columns[1:]
+                        if not is_number(columns[-1], debug):
+                            counts = columns[:-1]
+                        else:
+                            counts = columns
+                    else: 
+                        counts = columns
+                else:
+                    counts = columns
+                pwm_row_num += 1
+                if any([not is_number(c, debug) for c in counts]):
+                    return False
+    except:
+        errmsg = "An error occurred while reading {}.\n"
+        exception_handler(IOError, errmsg.format(motif_file), debug)
+    finally:
+        ifstream.close()
+    if pwm_row_num != 4:  # JASPAR like PFM should have at most 4 rows
         return False
-    ifstream = open(motif_file, mode="r")
-    header = ifstream.readline().strip()
-    if not header.startswith(">"):  # probably not JASPAR
-        return False
-    while True:
-        line = ifstream.readline()
-        line = line.strip().split()
-        if not line: break  # EOF or empty file?
-        if not line[1] == "[" and line[-1] == "]":
-            return False  # surely not JASPAR
-        counts = line[2:-1]
-        if any([not is_number(c, debug) for c in counts]):
-            return False
     return True
 
 # end of isJaspar_ff()
@@ -296,9 +311,13 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
         errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
-    ifstream = open(motif_file, mode="r")
-    for line in ifstream:
-        if line.startswith("MEME version"): return True
+    try:
+        ifstream = open(motif_file, mode="r")
+        for line in ifstream:
+            if line.startswith("MEME version"): return True
+    except:
+        errmsg = "An error occurred while reading {}.\n"
+        exception_handler(IOError, errmsg.format(motif_file), debug)
     return False  # no MEME version found --> improper input
 
 # end of isMEME_ff()
@@ -333,13 +352,56 @@ def isPFM_ff(motif_file: str, debug: bool) -> bool:
         errmsg = "{} seems to be empty.\n"
         exception_handler(EOFError, errmsg.format(motif_file), debug)
 
-    ifstream = open(motif_file, mode="r")
-    for line in ifstream:
-        if line.startswith(">"): continue  # probably from JASPAR
-        counts = line.strip().split()
-        if any([not is_number(c, debug) for c in counts]):
-            return False
+    motif_number = 0
+    motif_read = 0
+    try:
+        ifstream = open(motif_file, mode="r")
+        for line in ifstream:
+            if line:
+                columns = line.strip().split()
+                if not columns: break
+                fields = len(columns)
+                if line.startswith("#"): continue  # comment
+                elif line.startswith(">"):  # HOMER / hocomoco
+                    if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+                elif columns[0] == "Gene":  # ch2h2 zfs
+                    if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+                elif columns[0] == "Motif":  # ch2h2 zfs
+                    if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+                elif columns[0] == "Pos":  # cis-BP
+                    if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+                elif columns[0] in DNA_ALPHABET:
+                    if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+                else:  # motif starts here
+                    if fields == 4:
+                        counts = columns
+                    elif fields == 5:
+                        counts = columns[1:]
+                    else:
+                        continue
+                    if motif_number == motif_read:
+                        motif_number += 1  # read motif
+                    if any([not is_number(c, debug) for c in counts]):
+                        return False
+            else:  # empty lines could separate motifs
+                if motif_number != 0 and motif_read != motif_number:
+                        motif_read = motif_number
+    except:
+        print(columns)
+        errmsg = "An error occurred while reading {}.\n"
+        exception_handler(IOError, errmsg.format(motif_file), debug)
+    finally:
+        ifstream.close()
+    if motif_read != (motif_number - 1): 
+        return False
     return True
+
+# end of isPFM_ff()
 
 
 def isTRANSFAC_ff(motif_file: str, debug: bool) -> bool:
@@ -377,41 +439,43 @@ def isTRANSFAC_ff(motif_file: str, debug: bool) -> bool:
         "PO":False,
 
     }
-    width = 0
-    ifstream = open(motif_file, mode="r")
-    for line in ifstream:
-        line = line.strip()
-        if not line: continue  # empty lines allowed
-        line = line.split(None, 1)
-        key = line[0].strip()
-        if len(key) != 2:
-            return False
-        if len(line) == 2:  # key - value
-            value = line[1].strip()
-            if key in transfac_key_fields.keys():
-                if not value: return False
-                if key in ("P0", "PO"):  # old TRANSFAC files use PO instead of P0
-                    motif_alphabet = value.split()[:4]
-                    if motif_alphabet != DNA_ALPHABET: return False
-                transfac_key_fields[key] = True
-            try:
-                pos = int(key)  # check if counts line
-            except:
-                continue  
-            else:
-                if width == 0 and pos == 0:
-                    return False  # TRANSFAC motif should start from 0
-                width += 1
-                if width != pos: return False  # position mismatch
+    try:
+        width = 0
+        ifstream = open(motif_file, mode="r")
+        for line in ifstream:
+            line = line.strip()
+            if not line: continue  # empty lines allowed
+            line = line.split(None, 1)
+            key = line[0].strip()
+            if len(key) != 2:
+                return False
+            if len(line) == 2:  # key - value
+                value = line[1].strip()
+                if key in transfac_key_fields.keys():
+                    if not value: return False
+                    if key in ("P0", "PO"):  # old TRANSFAC files use PO instead of P0
+                        motif_alphabet = value.split()[:4]
+                        if motif_alphabet != DNA_ALPHABET: return False
+                    transfac_key_fields[key] = True
+                try:
+                    pos = int(key)  # check if counts line
+                except:
+                    continue  
+                else:
+                    if width == 0 and pos == 0:
+                        return False  # TRANSFAC motif should start from 0
+                    width += 1
+                    if width != pos: return False  # position mismatch
+    except:
+        errmsg = "An error occurred while reading {}.\n"
+        exception_handler(IOError, errmsg.format(motif_file), debug)
+    finally:
+        ifstream.close()
     if sum(transfac_key_fields.values()) == 3: return True
     return False
+
+# end of isTRANSFAC_ff()
             
-            
-
-
-
-    
-
 
 def isbed(bedfile: str, debug: bool) -> bool:
     """Check if the given file is in UCSC BED format.
