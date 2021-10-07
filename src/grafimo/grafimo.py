@@ -143,7 +143,6 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         if isMEME_ff(mtf, True): print("is MEME")
         if isPFM_ff(mtf, True): print("is PFM")
         if isTRANSFAC_ff(mtf, True): print("is TRANSFAC")
-    sys.exit(3)
        
     # TODO: remove
 
@@ -193,15 +192,15 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
             for i in range(len(m)):
                 print("Score matrix of {}:".format(mtf))
                 m[i].print("score_matrix") 
-        #for m1 in m:
-        #    m1.print("raw_counts")
-        #    print() 
-        #    m1.print("score_matrix")
-        #    print() 
-        #    m1.print("pval_matrix")
-        #    print() 
+        for m1 in m:
+            m1.print("raw_counts")
+            print() 
+            m1.print("score_matrix")
+            print() 
+            m1.print("pval_matrix")
+            print() 
         mtfSet.addMotif(m)
-    #sys.exit(4) # TODO: remove
+    sys.exit(4) # TODO: remove
     for mtf in mtfSet:
         # extract sequences
         sequence_loc: str = scan_graph(mtf, args_obj, debug)

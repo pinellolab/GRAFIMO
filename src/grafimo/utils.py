@@ -31,11 +31,11 @@ UNIF = "unfrm_dst"
 PSEUDObg = np.double(0.0000005)
 LOG_FACTOR = 1.44269504
 RANGE = 1000
-CHROMS_LIST = [str(i) for i in range(1, 23)] + ['X', 'Y']
+CHROMS_LIST = [str(i) for i in range(1, 23)] + ["X", "Y"]
 DEFAULT_OUTDIR = "default_out_dir_name"
-EXT_DEPS = ['tabix', 'vg', 'dot']
-SOURCE = 'grafimo'
-TP = 'nucleotide_motif'
+EXT_DEPS = ["tabix", "vg", "dot"]
+SOURCE = "grafimo"
+TP = "nucleotide_motif"
 PHASE = '.'
 JASPAR = bin(0)
 MEME = bin(1)
@@ -253,11 +253,13 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
     try:
         ifstream = open(motif_file, mode="r")
         for line in ifstream:
+            if line.startswith("#"): continue  # comment
             if line.startswith(">"):  # JASPAR / idmmpmm
                 continue
             else:
                 # motif start
                 columns = line.strip().split()
+                if not columns: continue  # skip blank lines
                 if columns[0] in DNA_ALPHABET:
                     columns = columns[1:]
                     if not is_number(columns[0], debug):
@@ -514,6 +516,8 @@ def isbed(bedfile: str, debug: bool) -> bool:
             else: return False
     # if EOF reached and no line started with chr --> False
     return False
+
+# end of isbed()
 
 
 def almost_equal(

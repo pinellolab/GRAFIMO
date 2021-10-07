@@ -24,6 +24,7 @@ from grafimo.utils import (
     isMEME_ff,
     isPFM_ff, 
     isTRANSFAC_ff,
+    is_number,
     almost_equal,
     sigint_handler, 
     exception_handler,
@@ -73,28 +74,51 @@ def build_motif_JASPAR(
     verbose: bool, 
     debug: bool
 ) -> Motif:
-    """Build the Motif object from a JASPAR motif Position Weight
-    Matrix.
+    """Build the Motif object from JASPAR-like PFMs.
 
-    It is computed the scoring matrix from the values given with the PWM
-    and the P-value matrix to assign a statistical significance to
-    each motif occurrence candidate, based on the resulting log-odds
-    score.
+    Motif examples:
+
+    # JASPAR
+    >MA0001.1 AGL3
+    A  [ 0  3 79 40 66 48 65 11 65  0 ]
+    C  [94 75  4  3  1  2  5  2  3  3 ]
+    G  [ 1  0  3  4  1  0  5  3 28 88 ]
+    T  [ 2 19 11 50 29 47 22 81  1  6 ]
+    
+    or
+
+    >MA0001.1 AGL3
+    0  3 79 40 66 48 65 11 65  0
+    94 75  4  3  1  2  5  2  3  3
+    1  0  3  4  1  0  5  3 28 88
+    2 19 11 50 29 47 22 81  1  6
+
+    # scertf pcm
+    A | 9 1 1 97 1 94
+    T | 80 1 97 1 1 2
+    C | 9 97 1 1 1 2
+    G | 2 1 1 1 97 2
+
+
+    Compute the scoring and the P-value matrix from PFM's values. The 
+    P-value matrix is used to assign the statistical significance of 
+    each binding affinity score obtained from the scoring matrix. The
+    score of each potential motif occurremce is assigned as log-likelihood. 
 
     ...
 
     Parameters
     ----------
     motif_file : str
-        path to the motif PWM
+        path to motif PFM
     bg_file
         path to the background file in Markov Background Format
         (http://meme-suite.org/doc/bfile-format.html).
     pseudocount : float
-        value to add to motif PWM counts
+        value to add to PFM counts
     no_reverse : bool
-        if False only the forward strand will be considered, otherwise
-        both forward and reverse are considered
+        if False consider only the forward strand, forward and reverse
+        otherwise
     verbose : bool
         print additional information
     debug : bool
@@ -103,7 +127,7 @@ def build_motif_JASPAR(
     Returns
     -------
     Motif
-        processed motif object
+        Motif object
     """
 
     if not isinstance(motif_file, str):
@@ -127,7 +151,12 @@ def build_motif_JASPAR(
     
     # parse motif PWM
     motif: Motif = read_JASPAR_motif(
-        motif_file, bg_file, pseudocount, no_reverse, verbose, debug
+        motif_file, 
+        bg_file, 
+        pseudocount, 
+        no_reverse, 
+        verbose, 
+        debug
     )
     if verbose: start_mp: float = time.time()
     motif = process_motif_for_logodds(motif, debug)  #  get log-odds values for motif
@@ -150,25 +179,22 @@ def read_JASPAR_motif(
     verbose: bool, 
     debug: bool
 ) -> Motif:
-    """Read a motif PWM in JASPAR format.
-
-    The data read are then used to build the scoring matrix for the 
-    motif, the P-value matrix, etc.
+    """Parser for JASPAR-like motif files.
 
     ...
 
     Parameters
     ----------
     motif_file : str
-        path to the motif PWM in JASPAR format
+        path to motif PFM
     bg_file
         path to the background file in Markov Background Format
         (http://meme-suite.org/doc/bfile-format.html).
     pseudocount : float
-        value to add to motif PWM counts
+        value to add to PFM counts
     no_reverse : bool
-        if False only the forward strand will be considered, otherwise
-        both forward and reverse are considered
+        if False consider only the forward strand, forward and reverse
+        otherwise
     verbose : bool
         print additional information
     debug:
@@ -182,68 +208,96 @@ def read_JASPAR_motif(
 
     nucs: List[str] = list()
     counts: List[float] = list()
-    if verbose:
-        start_rm: float = time.time()
+    motif_id: str = ""
+    motif_name: str = ""
+    pwm_row_num = 0
+    if verbose: start_rm = time.time()
     try:
         ifstream = open(motif_file, mode="r")
-        readlines = 0  # check for empty files
-        # begin parsing
-        header: str = str(ifstream.readline().strip()[1:])  
-        if not header:  # empty file?
-            errmsg = "{} seems to empty.\n"
-            exception_handler(IOError, errmsg.format(motif_file), debug) 
-        motifID, motifName = header.split('\t')[0:2]  
-        readlines += 1
         while True:
             line = ifstream.readline().strip()
             if not line: break  # EOF or empty file?
-            nuc = line.strip()[:1]
-            count = list(map(float, line.strip()[1:].split()[1:][:-1]))
-            nucs.append(nuc.upper())
-            counts.append(count)
-            readlines += 1
-        if readlines <= 1:  # only header read ?
+            if line.startswith("#"): continue  # comment
+            elif line.startswith(">"):
+                header = line.split()
+                if len(header) == 1:
+                    motif_id = header[0]
+                    motif_name = motif_id
+                elif len(header) > 1:
+                    motif_id = header[0]
+                    motif_name = header[1]
+                else:  # len(header) == 0  (????)
+                    motif_id = motif_file.split("/")[-1]  # motif fname
+                    motif_name = motif_id
+            else:  # motif start
+                columns = line.split()
+                if columns[0] in DNA_ALPHABET:
+                    nucs.append(columns[0])
+                    columns = columns[1:]
+                    if not is_number(columns[0], debug):
+                        columns = columns[1:]
+                        if not is_number(columns[-1], debug):
+                            columns = columns[:-1]
+                count = list(map(float, columns))
+                counts.append(count)
+                pwm_row_num += 1
+            print(pwm_row_num)
+            print(counts)
+        if pwm_row_num <= 1:  # read only header or empty file
             errmsg = "{} seems to be empty.\n"
             exception_handler(IOError, errmsg.format(motif_file), debug)
+        print(counts)
+        assert pwm_row_num == 4
+        if not motif_id: motif_id = motif_file.split("/")[-1]
+        if not motif_name: motif_name = motif_file.split("/")[-1]
     except:
-        errmsg = "An error occurred while reading {}.\n"
-        exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
-    else:
-        if any([len(c) != len(counts[0]) for c in counts]):
-            errmsg = "Motif counts width mismatch.\n"
-            exception_handler(ValueError, errmsg, debug)
-        nucsmap = dict()  # used with np object
-        for i in range(len(nucs)): nucsmap.update({nucs[i]:i})
-        motif_counts: pd.DataFrame = pd.DataFrame(data=counts, index=nucs)  # motif count matrix
-        motif_width: int = int(len(counts[0]))  
-        alphabet: list = sorted(nucs) 
-        
-        # compute background
-        if bg_file == UNIF: bgs = get_uniformBG(alphabet, debug)
-        elif os.path.isfile(bg_file): bgs = readBGfile(bg_file, debug)
-        else:
-            errmsg = "Unable to parse {}.\n"
-            exception_handler(BGFileError, errmsg.format(bg_file), debug)
-        bgs = pseudo_bg(bgs, no_reverse, debug)  # add pseudocount to bg
-        
-        # motif probability matrix
-        motif_probs = (motif_counts / motif_counts.sum(0)) 
-        motif_probs = norm_motif(motif_probs, motif_width, alphabet, debug)
-        motif_probs = apply_pseudocount_jaspar_pfm_transfac(
-            motif_counts.to_numpy(), motif_probs.to_numpy(), pseudocount, bgs, 
-            motif_width, alphabet, nucsmap, debug
-        )
-        motif: Motif = Motif(
-            motif_probs, motif_width, alphabet, motifID, motifName, nucsmap
-        )
-        motif.setBg(bgs)
-
-        if verbose:
-            end_rm: float = time.time()
-            msg: str = "Read motif %s in %.2fs" % (motifID, (end_rm - start_rm))
-            print(msg)
+        errmsg = "An error occured while reading {}.\n"
+        exception_handler(IOError, errmsg.format(motif_file), debug)
     finally:
-        ifstream.close() 
+        ifstream.close()
+    if any([len(c) != len(counts[0]) for c in counts]):
+        errmsg = "Motif counts width mismatch.\n"
+        exception_handler(ValueError, errmsg, debug)
+    if not nucs: nucs = DNA_ALPHABET
+    nucsmap = dict()  # used with np objects
+    for i in range(len(nucs)): nucsmap[nucs[i]] = i
+    # motif counts matrix
+    motif_counts: pd.DataFrame = pd.DataFrame(data=counts, index=nucs)
+    motif_width: int = motif_counts.shape[1]
+    alphabet: list = sorted(nucs)
+    # compute background
+    if bg_file == UNIF: bgs = get_uniformBG(alphabet, debug)
+    elif os.path.isfile(bg_file): bgs = readBGfile(bg_file, debug)
+    else:
+        errmsg = "Unable to parse {}.\n"
+        exception_handler(BGFileError, errmsg.format(bg_file), debug)
+    bgs = pseudo_bg(bgs, no_reverse, debug)  # add pseudocount to bg
+    # motif probability matrix
+    motif_probs = (motif_counts / motif_counts.sum(0))
+    motif_probs = norm_motif(motif_probs, motif_width, alphabet, debug)
+    motif_probs = apply_pseudocount_jaspar_pfm_transfac(
+        motif_counts.to_numpy(), 
+        motif_probs.to_numpy(), 
+        pseudocount, 
+        bgs, 
+        motif_width, 
+        alphabet, 
+        nucsmap, 
+        debug
+    )
+    motif: Motif = Motif(
+        motif_probs, 
+        motif_width, 
+        alphabet, 
+        motif_id,
+        motif_name,
+        nucsmap
+    )
+    motif.setBg(bgs)
+    if verbose:
+        end_rm: float = time.time()
+        msg: str = "Read motif %s in %.2fs" % (motif_id, (end_rm - start_rm))
+        print(msg)
 
     return motif
 
@@ -642,7 +696,45 @@ def build_PFM_motif(
     verbose: bool,
     debug: bool
 ) -> Motif:
-    """Build Motif objects from PFM motif files.
+    """Compute the motif score and P-value matrices from PFM motif files.
+
+    File examples:
+
+    # hocomoco
+    >GATA1_HUMAN.H11MO.0.A
+    96	202	103	99
+    58	72	95	275
+    28	39	320	113
+    59	103	195	143
+    97	157	141	105
+    134	123	139	104
+    112	105	184	99
+    131	84	170	115
+    107	112	157	124
+    166	94	162	78
+    92	194	161	53
+    360	10	4	126
+    3	0	497	0
+    498	0	0	2
+    1	0	6	493
+    473	2	7	18
+    429	8	45	18
+    107	77	277	39
+    176	94	173	57
+
+    # tiffin
+    T   A   G   C
+    30  0   28  40
+    0   0   0   99
+    0   55  14  29
+    0   99  0   0
+    20  78  0   0
+    0   52  7   39
+    19  46  11  22
+    0   60  38  0
+    0   33  0   66
+    73  0   25  0
+    99  0   0   0
 
     Computes PSSM scoring matrix from counts values stored in the input 
     PFM file. While computing the PSSM, the function build the 
@@ -1432,18 +1524,18 @@ def norm_motif(motif_probs: pd.DataFrame,
         errmsg = "Expected list, got {}.\n"
         exception_handler(TypeError, errmsg.format(type(alphabet).__name__), debug)
     if any([nuc not in DNA_ALPHABET for nuc in alphabet]):
-        errmsg = "The motif is not built on DNA alphabet.\n"
+        errmsg = "Unknown motif alphabet.\n"
         exception_handler(ValueError, errmsg, debug)
 
     # tolerance in the difference between the position probability and 1
     tolerance: float = 0.00001 
     for j in range(motif_width):
         tot = np.double(0)
-        for nuc in alphabet: tot += motif_probs.loc[nuc, j]
+        for nuc in alphabet: tot += motif_probs.loc[nuc,j]
         assert tot != 0
         if not almost_equal(1, tot, tolerance):
             for nuc in alphabet:
-                motif_probs.loc[nuc, j] = np.double(motif_probs.loc[nuc, j] / tot)
+                motif_probs.loc[nuc,j] = np.double(motif_probs.loc[nuc,j] / tot)
 
     return motif_probs
 
