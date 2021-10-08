@@ -19,6 +19,7 @@ from grafimo.res_writer import (
     print_results, 
     write_results
 )
+from grafimo.GRAFIMOException import VGError
 from grafimo.motif_ops import get_motif_pwm
 from grafimo.motif_set import MotifSet
 from grafimo.extract_regions import scan_graph
@@ -138,14 +139,6 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
         print()  # newline
     # end if
 
-    for mtf in args_obj.motif:
-        if isJaspar_ff(mtf, True): print("is JASPAR")
-        if isMEME_ff(mtf, True): print("is MEME")
-        if isPFM_ff(mtf, True): print("is PFM")
-        if isTRANSFAC_ff(mtf, True): print("is TRANSFAC")
-       
-    # TODO: remove
-
     errmsg: str
     # if genome graph is given, check that it is indexed (XG), otherwise index it
     if args_obj.has_graphgenome():
@@ -171,7 +164,7 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
                 )  # VG indexing
                 if code != 0:
                     errmsg = "An error occurred during {} indexing.\n"
-                    exception_handler(VGException, errmsg.format(args_obj.graph_genome), debug) 
+                    exception_handler(VGError, errmsg.format(args_obj.graph_genome), debug) 
             else:
                 errmsg = "To scan {} are required the XG and GBWT indexes.\n"
                 exception_handler(FileNotFoundError, errmsg.format(args_obj.graph_genome), debug)

@@ -252,7 +252,7 @@ def read_JASPAR_motif(
         if not motif_name: motif_name = motif_file.split("/")[-1]
     except:
         errmsg = "An error occured while reading {}.\n"
-        exception_handler(IOError, errmsg.format(motif_file), debug)
+        exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
     finally:
         ifstream.close()
     if any([len(c) != len(counts[0]) for c in counts]):
@@ -379,7 +379,7 @@ def build_motif_MEME(
     print("\nProcessing motifs\n")
 
     complete_motifs = list()  # fully processed motifs
-    if verbose: start_mp_all: str = time.time()
+    if verbose: start_mp_all: float = time.time()
     if motif_num >= cores:  # worth to use multiprocessing
         original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
         pool: mp.Pool = mp.Pool(processes=cores)  
@@ -693,6 +693,7 @@ def build_PFM_motif(
     bg_file: str,
     pseudocount: float,
     no_reverse: bool,
+    cores: int,
     verbose: bool,
     debug: bool
 ) -> Motif:
@@ -754,7 +755,10 @@ def build_PFM_motif(
     pseudocount : float
         value to add to motif PWM counts
     no_reverse : bool
-        if False, consider only forward strand. Use both strands otherwise.
+        if False, consider only forward strand. Use both strands 
+        otherwise
+    cores : int
+        number of CPU cores 
     verbose : bool
         print additional information
     debug : bool
@@ -789,19 +793,71 @@ def build_PFM_motif(
         exception_handler(TypeError, errmsg.format(type(no_reverse).__name__), debug)
 
     # parse motif
-    motif: Motif = read_PFM_motif(
-        motif_file, bg_file, pseudocount, no_reverse, verbose, debug 
+    if verbose: start_rm_all: float = time.time()
+    motifs: List[Motif] = read_PFM_motif(
+        motif_file, 
+        bg_file, 
+        pseudocount, 
+        no_reverse, 
+        verbose, 
+        debug 
     )
-    if verbose: start_mp = time.time()
-    motif = process_motif_for_logodds(motif, debug)
+    motif_num = len(motifs)
     if verbose:
-        stop_mp = time.time()
+        stop_rm_all = time.time()
         print(
-            "Motif %s processed in %.2fs" % (motif.motifID, (stop_mp - start_mp))
+            "Read all motifs in %s in %.2fs." % (motif_file, (stop_rm_all - start_rm_all))
         )
-
-    return motif
-
+    print(f"\nRead {motif_num} motifs in {motif_file}")
+    print("\nProcessing motifs\n")
+    complete_motifs = list()
+    if verbose: start_mp_all = time.time()
+    if motif_num >= cores:  # worth using multiprocessing
+        original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        pool: mp.Pool = mp.Pool(processes=cores)
+        # overwrite the default SIGINT handler to exit gracefully
+        # https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python
+        signal.signal(signal.SIGINT, original_sigint_handler)
+        try:
+            args = [(motif, debug) for motif in motifs]
+            res = (pool.starmap_async(process_motif_for_logodds, args))
+            it: int = 0
+            # --- progress bar
+            while (True):
+                if res.ready():
+                    # when finished call for the last time printProgressBar()
+                    printProgressBar(
+                        tot, tot, prefix='Progress:', suffix='Complete', length=50
+                    )
+                    break
+                if it == 0: tot = res._number_left
+                remaining = res._number_left
+                printProgressBar(
+                    (tot - remaining), tot, prefix='Progress:', suffix='Complete', length=50
+                )
+                time.sleep(1)
+                it += 1
+            complete_motifs += res.get(60 * 60 * 60)  # does not ignore signals
+        except KeyboardInterrupt:
+            pool.terminate()
+            sigint_handler()
+        pool.close()
+        if verbose:
+            stop_mp_all: float = time.time()
+            print(
+                "Processed motif(s) in %s in %.2fs" % (motif_file, (stop_mp_all - start_mp_all))
+            )
+        return complete_motifs
+    else:
+        for motif in motifs:
+            complete_motifs.append(process_motif_for_logodds(motif, debug))
+        if verbose:
+            stop_mp_all: float = time.time()
+            print(
+                "Processed motif(s) in %s in %.2fs" % (motif_file, (stop_mp_all - start_mp_all))
+            )
+        return complete_motifs
+    
 # end of build_PFM_motif()
 
 
@@ -842,89 +898,216 @@ def read_PFM_motif(
         Motif object 
     """
     
-    counts: List = list()
-    motifID = str() 
-    motifName = str()
-    if verbose: start_rm = time.time()
+    motifs_raw: List = list()
+    motifs: List[Motif] = list()
+    counts: List[float] = list()
+    alphabet: List[str] = list()
+    motif_id: str = ""
+    motif_name: str = ""
+    motif_number: int = 0
+    motif_read: int = 0
+
     try:
         ifstream = open(motif_file, mode="r")
-        readlines = 0
-        # begin parsing
-        while True:
-            line = ifstream.readline().strip()
-            if not line: break  # EOF or empty file?
-            if line.startswith(">"):  # PFM has header (probably from JASPAR db)
-                header = line[1:].split()
-                if not header:  # no data on header
-                    continue
-                else:
-                    if len(header) == 1:
-                        motifID = header[0]
-                        motifName = motifID
-                    elif len(header) == 2:  # found motif ID and Name
-                        motifID = header[0]
-                        motifName = header[1]
-                    else:  # len(header) > 2
-                        errmsg = "Too much data on header line of {}. Only motif ID and/or Name allowed.\n"
-                        exception_handler(ValueError, errmsg.format(motif_file), debug)
-                continue
-            # read counts
-            count = list(map(float, line.strip().split()))
-            counts.append(count)
-            readlines += 1
-        if readlines < 2:  # too few lines read
-            errmsg = "{} seems to be empty or there are missing data.\n"
-            exception_handler(IOError, errmsg.format(motif_file), debug)
+        for line in ifstream:
+            line = line.strip()
+            if line:
+                columns = line.split()
+                if not columns: break  # EOF or empty file?
+                fields = len(columns)
+                if line.startswith("#"): continue  # comment
+                elif line.startswith(">"):  # hocomoco PCM
+                    if motif_number != 0 and motif_number != motif_read:
+                        motifs_raw = __append_PFM(
+                            motif_file,
+                            motifs_raw,
+                            motif_name,
+                            motif_id,
+                            counts,
+                            alphabet,
+                            debug
+                        )
+                        motif_read = len(motifs_raw)
+                    motif_id = line[1:].strip().split()[0]
+                    motif_name = motif_id 
+                elif columns[0] == "Gene":
+                    if motif_number != 0 and motif_number != motif_read:
+                        motifs_raw = __append_PFM(
+                            motif_file,
+                            motifs_raw,
+                            motif_name,
+                            motif_id,
+                            counts,
+                            alphabet,
+                            debug
+                        )
+                        motif_read = len(motifs_raw)
+                    motif_name = columns[1]
+                elif columns[0] == "Motif":
+                    if motif_number != 0 and motif_number != motif_read:
+                        motifs_raw = __append_PFM(
+                            motif_file,
+                            motifs_raw,
+                            motif_name,
+                            motif_id,
+                            counts,
+                            alphabet,
+                            debug
+                        )
+                        motif_read = len(motifs_raw)
+                    motif_id = columns[1]
+                elif columns[0] == "Pos":
+                    if fields == 5:
+                        if motif_number != 0 and motif_number != motif_read:
+                            motifs_raw = __append_PFM(
+                                motif_file,
+                                motifs_raw,
+                                motif_name,
+                                motif_id,
+                                counts,
+                                alphabet,
+                                debug
+                            )
+                            motif_read = len(motifs_raw)
+                        alphabet = columns[1:]
+                        assert len(alphabet) == 4
+                        if any([n not in DNA_ALPHABET for n in alphabet]):
+                            errmsg = "Motif alphabet contains wrong characters.\n"
+                            exception_handler(ValueError, errmsg, debug)
+                elif columns[0] in DNA_ALPHABET:
+                    if fields == 4:
+                        alphabet = columns
+                        assert len(alphabet) == 4
+                        if any([n not in DNA_ALPHABET for n in alphabet]):
+                            errmsg = "Motif alphabet contains wrong characters.\n"
+                            exception_handler(ValueError, errmsg, debug)
+                    else:
+                        continue
+                else:  # motif counts
+                    if fields == 4:
+                        count = list(map(float, columns))
+                    elif fields == 5:
+                        count = list(map(float, columns[1:]))
+                    else: 
+                        continue
+                    if motif_number == motif_read:  # new motif starts here
+                        motif_number += 1
+                    counts.append(count)
+            else:
+                if motif_number != 0 and motif_number != motif_read:
+                        motifs_raw = __append_PFM(
+                            motif_file,
+                            motifs_raw,
+                            motif_name,
+                            motif_id,
+                            counts,
+                            alphabet,
+                            debug
+                        )
+                        motif_read = len(motifs_raw)
+        if motif_number != 0 and motif_number != motif_read:
+            motifs_raw = __append_PFM(
+                motif_file,
+                motifs_raw,
+                motif_name,
+                motif_id,
+                counts,
+                alphabet,
+                debug
+            )
+            motif_read = len(motifs_raw)
     except:
         errmsg = "An error occurred while reading {}.\n"
         exception_handler(MotifFileReadError, errmsg.format(motif_file), debug)
-    else:
-        assert len(counts) == 4
-        if any([len(c) != len(counts[0]) for c in counts[1:]]):
-            errmsg = "Motif width mismatch detected.\n"
-            exception_handler(ValueError, errmsg, debug)
-        nucsmap = dict()
-        for i in range(len(DNA_ALPHABET)): nucsmap.update({DNA_ALPHABET[i]:i})
-        motif_counts: pd.DataFrame = pd.DataFrame(data=counts, index=DNA_ALPHABET) # counts matrix
-        motif_width: int = len(counts[0])  # same length
-        # compute background 
-        if bg_file == UNIF: bgs = get_uniformBG(DNA_ALPHABET, debug)
-        elif os.path.isfile(bg_file): bgs = readBGfile(bg_file, debug)
-        else:
-            errmsg = "Unable to parse {}.\n"
-            exception_handler(BGFileError, errmsg.format(bg_file), debug)
-        bgs = pseudo_bg(bgs, no_reverse, debug)  # add pseudocount to background
-        # compute motif probability matrix
+    finally:
+        ifstream.close()
+    if os.path.isfile(bg_file): 
+        bgs = readBGfile(bg_file, debug)
+        bgs = pseudo_bg(bgs, no_reverse, debug)
+    elif bg_file != UNIF:
+        errmsg = "Unable to parse {}.\n"
+        exception_handler(BGFileError, errmsg.format(bg_file), debug)
+    for motif_raw in motifs_raw:
+        motif_counts = pd.DataFrame(
+            data=motif_raw["counts"], columns=motif_raw["alphabet"]
+        ).T
+        motif_width = motif_counts.shape[1]
+        if bg_file == UNIF:
+            bgs = get_uniformBG(motif_raw["alphabet"], debug)
+            bgs = pseudo_bg(bgs, no_reverse, debug)
         motif_probs = (motif_counts / motif_counts.sum(0))
-        motif_probs = norm_motif(motif_probs, motif_width, DNA_ALPHABET, debug)
+        motif_probs = norm_motif(
+            motif_probs, 
+            motif_width, 
+            motif_raw["alphabet"], 
+            debug
+        )
         motif_probs = apply_pseudocount_jaspar_pfm_transfac(
             motif_counts.to_numpy(),
             motif_probs.to_numpy(),
             pseudocount,
             bgs,
             motif_width,
-            DNA_ALPHABET,
-            nucsmap,
+            motif_raw["alphabet"],
+            motif_raw["nucsmap"],
             debug
         )
-        if not motifID and not motifName:  # missing header in PFM file
-            dummyName = os.path.abspath(motif_file).split("/")[-1]
-            motifID = dummyName
-            motifName = dummyName
         motif: Motif = Motif(
-            motif_probs, motif_width, DNA_ALPHABET, motifID, motifName, nucsmap
+            motif_probs, 
+            motif_width,
+            motif_raw["alphabet"],
+            motif_raw["motif_id"], 
+            motif_raw["motif_name"],
+            motif_raw["nucsmap"]
         )
-        motif.setBg(bgs)
-        if verbose:
-            stop_rm = time.time()
-            msg = "Read motif %s in %.2fs" % (motifID, (stop_rm - start_rm))
-            print(msg)
-    finally: 
-        ifstream.close()
+        motif.setBg(bgs) 
+        motifs.append(motif)
 
-    return motif
-
+    return motifs
+        
 # end of read_PFM_motif()
+
+
+def __append_PFM(
+    motif_file: str,
+    motifs: List[dict],
+    motif_name: str,
+    motif_id: str,
+    counts: List[float],
+    alphabet: List[str], 
+    debug: bool
+) -> List[dict]:
+    
+    if not motif_name and not motif_id:
+        dummy_name = os.path.abspath(motif_file).split("/")[-1]
+        motif_id = dummy_name
+        motif_name = dummy_name
+    elif not motif_name:
+        motif_name = motif_id
+    elif not motif_id:
+        motif_id = motif_name
+    if not counts:
+        errmsg = "Wrong motif read.\n"
+        exception_handler(ValueError, errmsg, debug)
+    if any([len(c) != len(counts[0]) for c in counts]):
+        errmsg = "Motif counts width mismatch.\n"
+        exception_handler(ValueError, errmsg, debug)
+    if not alphabet:
+        alphabet = DNA_ALPHABET
+    nucsmap = dict()
+    for i in range(len(alphabet)): nucsmap[alphabet[i]] = i
+    motif = {
+        "motif_name":motif_name,
+        "motif_id":motif_id,
+        "counts":counts,
+        "alphabet":alphabet,
+        "nucsmap":nucsmap
+    }
+    motifs.append(motif)
+    print("Read motif %s." % (motif_name))
+    return motifs
+
+# end of __append_PFM()    
 
 
 def build_TRANSFAC_motif(
@@ -1348,7 +1531,7 @@ def get_motif_pwm(motif_file: str,
         )
     elif motifFF == PFM:
         motif = build_PFM_motif(
-            motif_file, bgs, pseudo, no_reverse, verbose, debug
+            motif_file, bgs, pseudo, no_reverse, cores, verbose, debug
         )
     elif motifFF == TRANSFAC:
         motif = build_TRANSFAC_motif(
