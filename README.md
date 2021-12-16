@@ -285,7 +285,7 @@ All the scripts and IPython notebooks required to reproduce the experiments and 
 
 If you use GRAFIMO in your research, please cite us:
 
-Tognon, Manuel, et al. "GRAFIMO: variant and haplotype aware motif scanning on pangenome graphs." bioRxiv (2021).
+Tognon M, Bonnici V, Garrison E, Giugno R, Pinello L (2021) GRAFIMO: Variant and haplotype aware motif scanning on pangenome graphs. PLOS Computational Biology 17(9): e1009444. [https://doi.org/10.1371/journal.pcbi.1009444](https://doi.org/10.1371/journal.pcbi.1009444)
 
 ## License
 
