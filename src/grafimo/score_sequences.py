@@ -73,28 +73,28 @@ def compute_results(
     """
 
     if not isinstance(motif, Motif):
-        errmsg = "Expected Motif, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(motif).__name__), debug)
+        errmsg = f"Expected {type(Motif).__name__}, got {type(motif).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if not isinstance(sequence_loc, str):
-        errmsg = "Expected str, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(sequence_loc).__name__), debug)
+        errmsg = f"Expected {str.__name__}, got {type(sequence_loc).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if not os.path.isdir(sequence_loc):
-        errmsg = "Unable to locate {}.\n"
-        exception_handler(FileNotFoundError, errmsg.format(sequence_loc), debug)
+        errmsg = f"Unable to locate {sequence_loc}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
     if not testmode:
         if not isinstance(args_obj, Findmotif):
-            errmsg = "Expected Findmotif, got {}.\n"
-            exception_handler(TypeError, errmsg.format(type(args_obj).__name__), debug)
-
+            errmsg = f"Expected {type(Findmotif).__name__}, got {type(args_obj).__name__}.\n"
+            exception_handler(TypeError, errmsg, debug)
+    # read input arguments
     if not testmode:
-        cores: int = args_obj.cores
-        threshold: float = args_obj.threshold
-        no_qvalue: bool = args_obj.noqvalue
-        qval_t: bool = args_obj.qvalueT
-        no_reverse: bool = args_obj.noreverse
-        recomb: bool = args_obj.recomb
-        verbose: bool = args_obj.verbose
-    else:  # pytest - during normal execution we should never go here
+        cores = args_obj.cores
+        threshold = args_obj.threshold
+        no_qvalue = args_obj.noqvalue
+        qval_t = args_obj.qvalueT
+        no_reverse = args_obj.noreverse
+        recomb = args_obj.recomb
+        verbose = args_obj.verbose
+    else:  # for pytest ONLY - normally we should NEVER go here
         cores = 1
         threshold = float(1)
         recomb = True
@@ -104,25 +104,28 @@ def compute_results(
         verbose = False
     assert threshold > 0 and threshold <= 1
     assert cores >= 1
-
     print_scoring_msg(motif, no_reverse, debug)
-    cwd: str = os.getcwd()
+    cwd = os.getcwd()
+    # recover the correct potential motif matches
+    sequence_loc = os.path.join(sequence_loc, f"width_{motif.width}")
     os.chdir(sequence_loc)
-    manager: SyncManager = mp.Manager()
-    return_dict: DictProxy = manager.dict()  # results
-    scanned_nucs_dict: DictProxy = manager.dict()  # scanned nucleotides 
-    scanned_seqs_dict: DictProxy = manager.dict()  # scanned sequences 
-    sequences: List[str] = glob.glob('*.tsv')  # sequences
-    if len(sequences) < cores: cores = len(sequences)
+    manager = mp.Manager()  # manager to recover multiprocessing results
+    return_dict = manager.dict()  # results
+    scanned_nucs_dict = manager.dict()  # scanned nucleotides 
+    scanned_seqs_dict = manager.dict()  # scanned sequences 
+    sequences = glob.glob("*.tsv")  # sequences
+    if len(sequences) < cores: 
+        cores = len(sequences)  # avoid wasting cores 
     # split the sequence set in no. cores chunks
-    sequences_split: List[str] = np.array_split(sequences, cores)  
-    jobs = list()  # jobs list
-    proc_finished: int = 0 
+    sequences_split = np.array_split(sequences, cores)  
+    jobs = []  # jobs list
+    proc_finished = 0 
     # overwrite the default SIGINT handler to exit gracefully
     # https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGINT, original_sigint_handler)  
-    if verbose: start_s: float = time.time()
+    if verbose: 
+        start_s = time.time()
     try:
         for i in range(cores):
             p = mp.Process(
@@ -134,7 +137,9 @@ def compute_results(
             jobs.append(p)
             p.start()  
         # to print 0%, otherwise start from % as first chunk id already completed completed
-        printProgressBar(proc_finished, cores, prefix='Progress:', suffix='Complete', length=50)
+        printProgressBar(
+            proc_finished, cores, prefix='Progress:', suffix='Complete', length=50
+        )
         for job in jobs:
             job.join()  # sync point
             proc_finished += 1
@@ -147,48 +152,53 @@ def compute_results(
     else:
         if verbose:
             end_s: float = time.time()
-            print( "Scored all sequences in %.2fs" % (end_s - start_s))
-    os.chdir(cwd) 
-    if not testmode:
-        cmd: str = "rm -rf {}".format(sequence_loc)
-        code: int = subprocess.call(cmd, shell=True)
-        if code != 0:
-            errmsg = "An error occurred while executing {}.\n"
-            exception_handler(SubprocessError, errmsg.format(cmd), debug)
-    if verbose: start_df: str = time.time()
-    # recover all analysis results and summarize them in a single 
-    # data structure
+            print("Sequences scored in %.2fs" % (end_s - start_s))
+    os.chdir(cwd) # go back to source location
+    # recover all analysis results and summarize them in a single report
+    if verbose: 
+        start_df = time.time()
     seqs_scanned: int = 0
     nucs_scanned: int = 0
     summary = ResultTmp()
     for key in return_dict.keys():
         partialres = return_dict[key]
+        # TODO: improve partial results recovery
         summary.append_list(
-            partialres[0], partialres[1], partialres[2], partialres[3], 
-            partialres[4], partialres[5], partialres[6], partialres[7], 
-            partialres[8], partialres[9]
+            partialres[0], 
+            partialres[1], 
+            partialres[2], 
+            partialres[3], 
+            partialres[4], 
+            partialres[5], 
+            partialres[6], 
+            partialres[7], 
+            partialres[8], 
+            partialres[9]
         )
         seqs_scanned += scanned_seqs_dict[key]
         nucs_scanned += scanned_nucs_dict[key] 
     if summary.isempty():
-        errmsg = "No result retrieved. Unable to proceed. Are you using the correct VGs and searching on the right chromosomes?\n"
+        errmsg = "No result retrieved. Unable to proceed.\n" 
+        errmsg += "\nAre you using the correct VGs and searching on the right chromosomes?\n"
         exception_handler(ValueError, errmsg, debug)
-    # compute the q-values
+    # compute q-values
     if not no_qvalue:
-        if verbose: start_q = time.time()
+        if verbose: 
+            start_q = time.time()
         qvalues = compute_qvalues(summary.pvalues, debug)
         summary.add_qvalues(qvalues)
         if verbose:
             end_q = time.time()
             print("Q-values computed in %.2fs." % (end_q - start_q))
-    print("Scanned sequences:\t{}".format(seqs_scanned))
-    print("Scanned nucleotides:\t{}".format(nucs_scanned))
+    print(f"Scanned sequences:\t{seqs_scanned}")
+    print(f"Scanned nucleotides:\t{nucs_scanned}")
     # summarize results in a pandas DataFrame
-    finaldf = summary.to_df(motif, threshold, qval_t, recomb, ignore_qvals=no_qvalue)
+    finaldf = summary.to_df(
+        motif, threshold, qval_t, recomb, ignore_qvals=no_qvalue
+    )
     if verbose:
         end_df: float = time.time()
         print("\nResults summary built in %.2fs" % (end_df - start_df))
-    
     return finaldf
 
 # end of compute_results()

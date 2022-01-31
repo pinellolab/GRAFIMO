@@ -167,7 +167,6 @@ class Motif(object):
         motif_name: str,
         nucsmap: dict
     ):
-
         if not isinstance(count_matrix, np.ndarray):
             errmsg = "\n\nERROR: Expected numpy.ndarray, got {}.\n"
             raise TypeError(errmsg.format(type(count_matrix).__name__))
