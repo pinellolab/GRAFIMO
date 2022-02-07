@@ -1,4 +1,4 @@
-from grafimo.constructVG import build_vg, indexVG
+from grafimo.constructVG import build_vg, index_vg
 from grafimo.motif_ops import build_motif_MEME, build_motif_JASPAR
 from grafimo.score_sequences import compute_results
 from grafimo.extract_regions import get_seqs
@@ -41,7 +41,7 @@ def test_vg_index():
     expected_gbwt = "test_data/expected_results/expected.gbwt"
 
     # index vg and check results
-    done = indexVG(test_vg, test_vcf, 1, True, True)
+    done = index_vg(test_vg, test_vcf, 1, True, True)
 
     assert (
         (done == 0) and 
@@ -88,7 +88,7 @@ def test_motif_processing_meme():
     # process the motif in MEME format
     proc_motif_meme = build_motif_MEME(
         memefn, "unfrm_dst", 0.1, False, mp.cpu_count(), False, True
-    )[0].scoreMatrix
+    )[0].score_matrix
 
     # check correctness
     assert (proc_motif_meme == er_motif).all()
@@ -105,7 +105,7 @@ def test_motif_processing_jaspar():
 
     proc_motif_jaspar = build_motif_JASPAR(
         jasparfn, "unfrm_dst", 0.1, False, False, True
-    ).scoreMatrix
+    ).score_matrix
 
     assert (proc_motif_jaspar == er_motif).all()
 
