@@ -6,7 +6,7 @@ occurrences candidates scoring step of GRAFIMO analysis.
 
 from grafimo.motif import Motif
 
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 import numpy as np
@@ -75,29 +75,20 @@ class ResultTmp(object):
         genomic variants
     """
 
-    #-------------------------------------------------------------------
-    # ResultTmp Attributes
-    #
-    _seqnames: List[str] = list()
-    _seqs: List[str] = list()
-    _chroms: List[str] = list()
-    _starts: List[int] = list()
-    _stops: List[int] = list()
-    _strands: List[str] = list()
-    _scores: List[np.double] = list()
-    _pvalues: List[np.double] = list()
-    _qvalues: List[np.double] = list()
-    _frequencies: List[int] = list()
-    _references: List[str] = list()
-
-    #-------------------------------------------------------------------
-    # ResultTmp methods
-    #
-
     # these errors should never appear --> no need for error formatting
     # can assume that debug mode == True
     def __init__(self):
-        pass
+        self._seqnames = list()
+        self._seqs = list()
+        self._chroms = list()
+        self._starts = list()
+        self._stops = list()
+        self._strands = list()
+        self._scores = list()
+        self._pvalues = list()
+        self._qvalues = list()
+        self._frequencies = list()
+        self._references = list()
 
 
     def __str__(self):
@@ -117,38 +108,49 @@ class ResultTmp(object):
         ])
 
 
-    def append(self, seqname, seq, chrom, start, stop, strand, score, pvalue, freq, ref):
+    def append(
+        self, 
+        seqname: str, 
+        seq: str, 
+        chrom: str, 
+        start: int, 
+        stop: int, 
+        strand: str, 
+        score: float, 
+        pvalue: float, 
+        freq: int, 
+        ref: str
+    ) -> None:
         if not isinstance(seqname, str):
-            errmsg = "\n\nERROR: Expected str, got {}.\n"
-            raise TypeError(errmsg.format(type(seqname).__name__))
+            errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(seqname).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(seq, str):
-            errmsg = "\n\nERROR: Expected str, got {}.\n"
-            raise TypeError(errmsg.format(type(seq).__name__))
+            errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(seq).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(chrom, str):
-            errmsg = "\n\nERROR: Expected str, got {}.\n"
-            raise TypeError(errmsg.format(type(chrom).__name__))
+            errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(chrom).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(start, int):
-            errmsg = "\n\nERROR: Expected int, got {}.\n"
-            raise TypeError(errmsg.format(type(start).__name__))
+            errmsg = f"\n\nERROR: Expected {int.__name__}, got {type(start).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(stop, int):
-            errmsg = "\n\nERROR: Expected int, got {}.\n"
-            raise TypeError(errmsg.format(type(stop).__name__))
+            errmsg = f"\n\nERROR: Expected {int.__name__}, got {type(stop).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(strand, str):
-            errmsg = "\n\nERROR: Expected str, got {}.\n"
-            raise TypeError(errmsg.format(type(strand).__name__))
+            errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(strand).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(score, float):
-            errmsg = "\n\nERROR: Expected float, got {}.\n"
-            raise TypeError(errmsg.format(type(score).__name__))
+            errmsg = f"\n\nERROR: Expected {float.__name__}, got {type(score).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(pvalue, float):
-            errmsg = "\n\nERROR: Expected float, got {}.\n"
-            raise TypeError(errmsg.format(type(pvalue).__name__))
+            errmsg = f"\n\nERROR: Expected {float.__name__}, got {type(pvalue).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(freq, int):
-            errmsg = "\n\nERROR: Expected int, got {}.\n"
-            raise TypeError(errmsg.format(type(freq).__name__))
+            errmsg = f"\n\nERROR: Expected {int.__name__}, got {type(freq).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(ref, str):
-            errmsg = "\n\nERROR: Expected str, got {}.\n"
-            raise TypeError(errmsg.format(type(ref).__name__))
-
+            errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(ref).__name__}.\n"
+            raise TypeError(errmsg)
         self._seqnames.append(seqname)
         self._seqs.append(seq)
         self._chroms.append(chrom)
@@ -171,54 +173,52 @@ class ResultTmp(object):
         assert len(self._seqnames) == len(self._pvalues)
         assert len(self._seqnames) == len(self._frequencies)
         assert len(self._seqnames) == len(self._references)
-
         return len(self._seqnames)
 
     
     def append_list(
         self, 
-        seqnames, 
-        seqs, 
-        chroms, 
-        starts, 
-        stops, 
-        strands, 
-        scores, 
-        pvalues, 
-        frequencies, 
-        references
-    ):
+        seqnames: List[str], 
+        seqs: List[str], 
+        chroms: List[str], 
+        starts: List[int], 
+        stops: List[int], 
+        strands: List[str], 
+        scores: List[float], 
+        pvalues: List[float], 
+        frequencies: List[int], 
+        references: List[str]
+    ) -> None:
         if not isinstance(seqnames, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(seqnames).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(seqnames).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(seqs, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(seqs).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(seqs).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(chroms, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(chroms).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(chroms).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(starts, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(starts).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(starts).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(stops, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(stops).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(stops).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(strands, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(strands).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(strands).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(scores, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(scores).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(scores).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(pvalues, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(pvalues).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(pvalues).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(frequencies, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(frequencies).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(frequencies).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(references, list):
-            errmsg = "Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(references).__name__))
-        
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(references).__name__}.\n"
+            raise TypeError(errmsg) 
         self._seqnames += seqnames
         self._seqs += seqs
         self._chroms += chroms
@@ -231,39 +231,46 @@ class ResultTmp(object):
         self._references += references
 
     
-    def add_qvalues(self, qvalues):
+    def add_qvalues(self, qvalues: List[float]) -> None:
         if not isinstance(qvalues, list):
-            errmsg = "\n\nERROR: Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(qvalues).__name__))
+            errmsg = f"\n\nERROR: Expected {list.__name__}, got {type(qvalues).__name__}.\n"
+            raise TypeError(errmsg)
         self._qvalues = qvalues
 
     
-    def to_df(self, motif, threshold, qvalt, recomb, ignore_qvals=False):
+    def to_df(
+        self, 
+        motif: Motif, 
+        threshold: float, 
+        qvalt: bool, 
+        recomb: bool, 
+        ignore_qvals: Optional[bool] = False
+    ) -> pd.DataFrame:
         if not isinstance(motif, Motif):
-            errmsg = "\n\nERROR: Expected Motif, got {}.\n"
-            raise TypeError(errmsg.format(type(motif).__name__))
+            errmsg = f"\n\nERROR: Expected {type(Motif).__name__}, got {type(motif).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(threshold, float):
-            errmsg = "\n\nERROR: Expected float, got {}.\n"
-            raise TypeError(errmsg.format(type(threshold).__name__))
+            errmsg = f"\n\nERROR: Expected {float.__name__}, got {type(threshold).__name__}.\n"
+            raise TypeError(errmsg)
         if threshold <= 0 or threshold > 1:
             errmsg = "\n\nERROR: The threshold must be between 0 and 1.\n"
             raise ValueError(errmsg)
         if not isinstance(qvalt, bool):
-            errmsg = "\n\nERROR: Expected bool, got {}.\n"
-            raise ValueError(errmsg.format(type(qvalt).__name__))
+            errmsg = f"\n\nERROR: Expected {bool.__name__}, got {type(qvalt).__name__}.\n"
+            raise ValueError(errmsg)
         if not isinstance(recomb, bool):
-            errmsg = "Expected bool, got {}.\n"
-            raise TypeError(errmsg.format(type(recomb).__name__))
+            errmsg = f"Expected {bool.__name__}, got {type(recomb).__name__}.\n"
+            raise TypeError(errmsg)
         if not isinstance(ignore_qvals, bool):
-            errmsg = "\n\nERROR: Expected bool, got {}.\n"
-            raise TypeError(errmsg.format(type(ignore_qvals).__name__))
-        
-        if qvalt: assert bool(self._qvalues) and not ignore_qvals
+            errmsg = f"\n\nERROR: Expected {bool.__name__}, got {type(ignore_qvals).__name__}.\n"
+            raise TypeError(errmsg)
+        if qvalt: 
+            assert bool(self._qvalues) and not ignore_qvals
         if ignore_qvals:
             df = pd.DataFrame(
                 {
-                    "motif_id":[motif.motifID] * len(self._seqnames),
-                    "motif_alt_id":[motif.motifName] * len(self._seqnames),
+                    "motif_id":[motif.motif_id] * len(self._seqnames),
+                    "motif_alt_id":[motif.motif_name] * len(self._seqnames),
                     "sequence_name":self.seqnames,
                     "start":self.starts,
                     "stop":self.stops,
@@ -278,8 +285,8 @@ class ResultTmp(object):
         else:  # ignore_qvals == False
             df = pd.DataFrame(
                 {
-                    "motif_id":[motif.motifID] * len(self._seqnames),
-                    "motif_alt_id":[motif.motifName] * len(self._seqnames),
+                    "motif_id":[motif.motif_id] * len(self._seqnames),
+                    "motif_alt_id":[motif.motif_name] * len(self._seqnames),
                     "sequence_name":self.seqnames,
                     "start":self.starts,
                     "stop":self.stops,
@@ -302,18 +309,20 @@ class ResultTmp(object):
         if not recomb:
             df_thresh = df_thresh[df_thresh["haplotype_frequency"] > 0]
         # sort by p-value
-        df_thresh = df_thresh.sort_values(["p-value"], ascending=True).reset_index(drop=True)
-
+        df_thresh = df_thresh.sort_values(["p-value"], ascending=True)
+        df_thresh.reset_index(drop=True, inplace=True)
         return df_thresh
 
     
-    def isempty(self):
+    def isempty(self) -> bool:
         # q-values can be empty --> ignore them
         # if just one of the mandatory fields is empty we cannot proceed 
-        if (not self._seqnames or not self._seqs or not self._chroms or 
+        if (
+            not self._seqnames or not self._seqs or not self._chroms or 
             not self._starts or not self._stops or not self._strands or 
             not self._scores or not self._pvalues or not self._frequencies or
-            not self._references):
+            not self._references
+        ):
             return True
         return False
 

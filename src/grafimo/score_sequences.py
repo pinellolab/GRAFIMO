@@ -17,9 +17,12 @@ The running time of the algorithm used is bounded by O(n^2).
 from grafimo.motif import Motif
 from grafimo.workflow import Findmotif
 from grafimo.resultsTmp import ResultTmp
-from grafimo.GRAFIMOException import WrongPathException, ValueException, \
-    SubprocessError
-from grafimo.utils import die, printProgressBar, sigint_handler, exception_handler
+from grafimo.utils import (
+    die, 
+    printProgressBar, 
+    sigint_handler, 
+    exception_handler
+)
 
 from typing import List, Optional, Dict, Tuple
 from statsmodels.stats.multitest import multipletests
@@ -38,7 +41,6 @@ import sys
 import os
 
 
-
 def compute_results(
     motif: Motif,
     sequence_loc: str,
@@ -48,28 +50,29 @@ def compute_results(
 ) -> pd.DataFrame:
     """Score the sequences extracted from the genome variation graph.
 
-    The potential motif occurrences are scored using the scaled scoring matrix.
-    The scaled values are then used to retrieve the corresponding P-value.
+    The potential motif occurrences are scored using the scaled scoring 
+    matrix. The scaled values are then used to retrieve the corresponding 
+    P-value.
 
     ...
     
     Parameters
     ----------
     motif : Motif
-        motif object
+        Motif 
     sequence_loc : str
-        path to sequences extracted
+        Path to sequences location
     debug : bool
-        trace the full error stack
+        Trace the full error stack
     args_obj : Findmotif, optional
-        commandline arguments container
+        Commandline arguments container
     testmode : bool, optional
-        test (manually set)
+        Test mode (manually set)
 
     Returns
     -------
     pandas.DataFrame
-        results
+        Results table
     """
 
     if not isinstance(motif, Motif):
@@ -130,35 +133,41 @@ def compute_results(
         for i in range(cores):
             p = mp.Process(
                 target=score_seqs, args=(
-                    sequences_split[i], motif, no_reverse, return_dict, 
-                    scanned_seqs_dict, scanned_nucs_dict, i, debug
+                    sequences_split[i], 
+                    motif, 
+                    no_reverse, 
+                    return_dict, 
+                    scanned_seqs_dict, 
+                    scanned_nucs_dict, 
+                    i, 
+                    debug
                 )
             )
             jobs.append(p)
             p.start()  
         # to print 0%, otherwise start from % as first chunk id already completed completed
         printProgressBar(
-            proc_finished, cores, prefix='Progress:', suffix='Complete', length=50
+            proc_finished, cores, prefix="Progress:", suffix="Complete", length=50
         )
         for job in jobs:
             job.join()  # sync point
             proc_finished += 1
             printProgressBar(
-                proc_finished, cores, prefix='Progress:', suffix='Complete', length=50
+                proc_finished, cores, prefix="Progress:", suffix="Complete", length=50
             )
     except KeyboardInterrupt:
         sigint_handler()
         die(2)
     else:
         if verbose:
-            end_s: float = time.time()
+            end_s = time.time()
             print("Sequences scored in %.2fs" % (end_s - start_s))
     os.chdir(cwd) # go back to source location
     # recover all analysis results and summarize them in a single report
     if verbose: 
         start_df = time.time()
-    seqs_scanned: int = 0
-    nucs_scanned: int = 0
+    seqs_scanned = 0
+    nucs_scanned = 0
     summary = ResultTmp()
     for key in return_dict.keys():
         partialres = return_dict[key]
@@ -177,7 +186,7 @@ def compute_results(
         )
         seqs_scanned += scanned_seqs_dict[key]
         nucs_scanned += scanned_nucs_dict[key] 
-    if summary.isempty():
+    if summary.isempty():  # no results?
         errmsg = "No result retrieved. Unable to proceed.\n" 
         errmsg += "\nAre you using the correct VGs and searching on the right chromosomes?\n"
         exception_handler(ValueError, errmsg, debug)
@@ -223,49 +232,54 @@ def score_seqs(
 
     Parameters
     ----------
-    sequences : list
-        sequences
+    sequences : List[str]
+        Potential motif occurrence sequences
     motif : Motif
-        motif object 
+        Motif 
     noreverse : bool
-        skip reverse strand
+        Skip reverse strand
     return_dict : multiprocessing.managers.DictProxy
-        result dictionary
+        Result dictionary
     scanned_seqs_dict : mp.managers.DictProxy
-        number of scanned sequences dictionary
+        Number of scanned sequences dictionary
     scanned_nucs_dict : mp.managers.DictProxy
-        number of scanned nucleotides dictionary
+        Number of scanned nucleotides dictionary
     pid : int
-        process id
+        Process id
     chroms_prefix : str
-        chromosome name prefix
+        Chromosome name prefix
     namemap : dict
-        chromosome namemap
+        Chromosome namemap
     debug : bool
-        trace the full error stack
+        Trace the full error stack
+
+    Returns
+    -------
+    None
     """
 
     try:
-        assert motif.isScaled
-        score_matrix: np.ndarray = motif.scoreMatrix
-        pval_mat: np.array = motif.pvalMatrix
-        min_score: int = motif.minval
-        scale: int = motif.scale
-        width: int = motif.width
-        offset: np.double = motif.offset
-        nucsmap: dict = motif.nucsmap
+        assert motif.is_scaled
+        score_matrix = motif.score_matrix
+        pval_mat = motif.pval_matrix
+        min_score = motif.min_val
+        scale = motif.scale
+        width = motif.width
+        offset = motif.offset
 
         #restmp = ResultTmp()
         restmp = [[], [], [], [], [], [], [], [], [], []]
-        seqs_scanned: int = 0  # counter for scanned sequences 
+        seqs_scanned = 0  # counter for scanned sequences 
         for s in sequences:
-            ifstream = open(s, mode="r")
+            handle = open(s, mode="r")
             while True:
-                line = ifstream.readline()
-                if not line: break  # EOF
+                line = handle.readline()
+                if not line: 
+                    break  # EOF
                 data = line.strip().split()
                 strand = data[2][-1]
-                if noreverse and strand == "-": continue
+                if noreverse and strand == "-": 
+                    continue
                 else:
                     # parse data
                     seqname = data[0]
@@ -278,12 +292,19 @@ def score_seqs(
                     freq = data[4]
                     ref = data[5]
                     score, pvalue = compute_score_seq(
-                        seq, score_matrix, pval_mat, min_score, scale, width, offset
+                        seq, 
+                        score_matrix, 
+                        pval_mat, 
+                        min_score, 
+                        scale, 
+                        width, 
+                        offset
                     )
                     seqs_scanned += 1
                     # fix indel reference report bug
-                    distance: int = np.abs(stop - start)
-                    if (ref == "ref" and distance != width): ref = "non.ref"
+                    distance = np.abs(stop - start)
+                    if (ref == "ref" and distance != width): 
+                        ref = "non.ref"
                     #restmp.append(
                     #    seqname, seq, chrom, start, stop, strand, score, pvalue, 
                     #    int(freq), ref
@@ -317,51 +338,59 @@ def compute_score_seq(
     width: int,
     offset: np.double
 ) -> Tuple[np.double, np.double]:
-    """Assign to a DNA sequence a log-odds score based on motif scoring
-    matrix. To each score is assigned a corresponding P-value.
+    """Compute the likelihood score for a DNA sequece to be a potential
+    occurrence of the input motif. To each score is assigned the 
+    corresponding statistical significance (P-value). The P-values are 
+    then corrected in q-values.
+    
+    ...
 
     Parameters
     ----------
     seq : str
-        sequence
+        DNA sequence
     score_matrix : numpy.ndarray 
-        motif scaled scoring matrix
+        Motif scaled scoring matrix
     pval_mat : numpy.ndarray
-        motif P-value matrix
+        Motif P-value matrix
     min_score : int
-        minimum score 
+        Minimum score in the scaled motif matrix 
     scale : int
-        scaling factor
+        Scaling factor
     width : int
-        motif width
+        Motif width
     offset : numpy.double
-        scaling offset
+        Scaling offset
 
     Returns
     -------
     numpy.double
-        log-odds score
+        Sequence log-odds score
     numpy.double
-        P-value
+        Log-odds score P-value
     """
 
-    score: int = 0
+    score = 0
     for i in range(width):
-        nuc: str = seq[i]
-        if nuc == 'N':
+        nuc = seq[i]
+        if nuc == "N":
             score = min_score
             break  # we don't go further
-        if nuc.upper() == "A": nucidx = 0
-        elif nuc.upper() == "C": nucidx = 1
-        elif nuc.upper() == "G": nucidx = 2
-        elif nuc.upper() == "T": nucidx = 3
+        if nuc.upper() == "A": 
+            nucidx = 0
+        elif nuc.upper() == "C": 
+            nucidx = 1
+        elif nuc.upper() == "G": 
+            nucidx = 2
+        elif nuc.upper() == "T": 
+            nucidx = 3
         score += score_matrix[nucidx, i]
     assert score >= min_score
     # get the p-value for the obtained score
     tot = pval_mat.sum()
-    pvalue: np.double = (pval_mat[score:].sum()) / tot
+    pvalue = (pval_mat[score:].sum()) / tot
     # retrieve the log-likelihood score
-    logodds: np.double = (score / scale) + (width * offset)
+    logodds = (score / scale) + (width * offset)
     score = logodds
     assert (pvalue > 0 and pvalue <= 1)
     return score, pvalue
@@ -370,61 +399,65 @@ def compute_score_seq(
 
 
 def compute_qvalues(pvalues: List[np.double], debug: bool) -> List[np.double]:
-    """Corrects P-values with False Discovery Rate Benjamini-Hochberg procedure.
+    """Correct P-values by False Discovery Rate (Benjamini-Hochberg 
+    procedure).
 
     ...
 
     Parameters
     ----------
-    pvalues : list
+    pvalues : List[float]
         P-values
     debug : bool
-        trace the full error stack
+        Trace the full error stack
 
     Returns
     -------
-    list
-        corrected P-values (q-values)
+    List[float]
+        Corrected P-values (q-values)
     """
 
     if not isinstance(pvalues, list):
-        errmsg = "Expected list, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(pvalues).__name__), debug)
-
+        errmsg = f"Expected {list.__name__}, got {type(pvalues).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     print("\nComputing q-values...\n")
-    # use Benjamini-Hochberg procedure to correct P-values
-    mt_obj = multipletests(pvalues, method="fdr_bh")
-    qvalues: List[float] = list(mt_obj[1])
-
+    # use Benjamini-Hochberg to correct P-values
+    res_fdr = multipletests(pvalues, method="fdr_bh")
+    qvalues = list(res_fdr[1])
+    assert len(pvalues) == len(qvalues)
     return qvalues
 
 # end of compute_qvalues()
 
 
-def print_scoring_msg(motif: Motif, noreverse: bool, debug: bool):
-    """Message printed when scoring procedure begins.
+def print_scoring_msg(motif: Motif, noreverse: bool, debug: bool) -> None:
+    """Print this message when the scoring step begins.
 
     ...
 
     Parameters
     ----------
     motif : Motif
-        motif object
+        Motif 
     noreverse : bool
-        skip reverse strand sequences
+        Skip reverse strand sequences
     debug : bool
-        trace the full error stack
+        Trace the full error stack
+
+    Returns
+    -------
+    None
     """
 
     if not isinstance(motif, Motif):
-        errmsg = "Expected Motif, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(motif).__name__), debug)
+        errmsg = f"Expected {type(Motif).__name__}, got {type(motif).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if not isinstance(noreverse, bool):
-        errmsg = "Expected bool, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(noreverse).__name__), debug)
-
-    fw_id: str = "".join(["+", motif.motifID])
-    if not noreverse: rev_id: str = "".join(["-", motif.motifID])
+        errmsg = f"Expected {bool.__name__}, got {type(noreverse).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
+    fw_id = "".join(["+", motif.motif_id])
+    if not noreverse: 
+        rev_id = "".join(["-", motif.motif_id])
     msg = "Scoring hits for motif {}."
     print(msg.format(fw_id))
     if not noreverse:

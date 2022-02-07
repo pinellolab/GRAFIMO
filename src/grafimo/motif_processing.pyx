@@ -12,10 +12,18 @@ wrapper to call them is provided.
 """
 
 
-from grafimo.utils import DNA_ALPHABET, lg2, RANGE, isListEqual, exception_handler
-from grafimo.GRAFIMOException import NotValidAlphabetException, \
-    FileReadError, NoDataFrameException, NotValidMotifMatrixException, \
-    BGFileError, ScaledScoreMatrixException, MotifProcessingError
+from grafimo.utils import (
+    lg2,
+    isListEqual, 
+    exception_handler,
+    DNA_ALPHABET, 
+    RANGE
+)
+from grafimo.grafimo_errors import (
+    FileReadError, 
+    BGFileError, 
+    MotifProcessingError
+)
 from grafimo.motif import Motif
 
 from libc.stdlib cimport strtod
@@ -29,7 +37,7 @@ import os
 
 
 #-------------------------- read the background file --------------------------#
-cdef creadBGFile(bg_file, debug):
+cdef cread_bg_File(bg_file, debug):
     """Read the background probabilties file. The background file must store the 
     probability for eachnucleotide (A, C, G, T).
 
@@ -53,26 +61,19 @@ cdef creadBGFile(bg_file, debug):
         dictionary containing the background probabilities
     """
 
-    if not isinstance(bg_file, str):
-        errmsg = "Expected str, got %s.\n" % type(bg_file).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not os.path.isfile(bg_file):
-        errmsg = "Unable to locate %s.\n" % bg_file
-        exception_handler(FileNotFoundError, errmsg, debug)
-
     # ---- C vars
     cdef double prob  
     cdef char** endptr = NULL
     # ---- Py vars
     bg_dict: Dict = dict()
     found_nucs: Set = set()
-
     # bgfile parsing
     try:
         readlines = 0  # check if bgfile is empty
         ifstream = open(bg_file, mode="r") 
         for line in ifstream:
-            if line[0] == "#": continue  # header
+            if line[0] == "#": 
+                continue  # header
             if line[0].upper() in DNA_ALPHABET:
                 nuc, prob_str = line.split()
                 prob_str = prob_str.encode("UTF-8")  # from str to bytes
@@ -87,7 +88,8 @@ cdef creadBGFile(bg_file, debug):
                 errmsg = "Found symbol not part of the DNA alphabet: %s\n" % line[0]
                 exception_handler(ValueError, errmsg, debug)
             # all nucs read
-            if len(found_nucs) == len(DNA_ALPHABET): break
+            if len(found_nucs) == len(DNA_ALPHABET): 
+                break
     except:
         errmsg = "An error occurred while parsing %s" % bg_file
         exception_handler(BGFileError, errmsg, debug)
@@ -99,7 +101,7 @@ cdef creadBGFile(bg_file, debug):
 # end creadBGfile()
 
 
-def readBGfile(bg_file: str, debug: bool) -> Dict:
+def read_bg_file(bg_file: str, debug: bool) -> Dict[str, float]:
     """Python wrapper for creadBGfile() function 
 
     Read the background probabilties file. The background file must store the 
@@ -125,11 +127,11 @@ def readBGfile(bg_file: str, debug: bool) -> Dict:
         dictionary containing the background probabilities
     """
 
-    return creadBGFile(bg_file, debug)
+    return cread_bg_File(bg_file, debug)
 
 
 ### uniform background distribution ###
-cdef cget_uniformBG(alphabet, debug):
+cdef cget_uniform_bg(alphabet, debug):
     """Compute a uniform background probability distribution for a given alphabet
     of characters.
 
@@ -149,28 +151,19 @@ cdef cget_uniformBG(alphabet, debug):
         distribution
     """
 
-    if not isinstance(alphabet, list):
-        errmsg = "Expected list, got %s.\n" % type(alphabet).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not isListEqual(alphabet, DNA_ALPHABET):
-        errmsg = "The background alphabet is not the DNA alphabet.\n"
-        exception_handler(ValueError, errmsg, debug)
-
     # ---- C vars
     cdef int alphasz  # alphabet size
     cdef double unifp  # uniform probabilities
     # ---- Py vars
-    bg_dict: Dict = dict()
-
     alphasz = len(alphabet)
     unifp = 1.0 / <double>alphasz
-    for i in range(alphasz): bg_dict.update({alphabet[i]: unifp})
+    bg_dict = {alphabet[i]:unifp for i in range(alphasz)}
     return bg_dict
 
 # end cget_uniformBG()
 
 
-def get_uniformBG(alphabet: List[str], debug: bool) -> Dict:
+def get_uniform_bg(alphabet: List[str], debug: bool) -> Dict[str, float]:
     """Python wrapper for cget_uniformBG() function 
     
     Compute a uniform background probability distribution for a given alphabet
@@ -192,7 +185,7 @@ def get_uniformBG(alphabet: List[str], debug: bool) -> Dict:
         distribution
     """
 
-    return cget_uniformBG(alphabet, debug)
+    return cget_uniform_bg(alphabet, debug)
 
 
 ### post-process jaspar motif ###
@@ -236,39 +229,18 @@ cdef capply_pseudocount_jaspar(
         processed motif probability matrix
     """
 
-    if not isinstance(counts_matrix, np.ndarray):
-        errmsg = "Expected numpy.ndarray, got %s.\n" % type(counts_matrix).__name__
-        exception_handler(TypeError, errmsg, debug)
     if counts_matrix.size == 0 or sum(sum(counts_matrix)) == 0:
         errmsg = "Motif counts matrix is empty.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(probs_matrix, np.ndarray):
-        errmsg = "Expected numpy.ndarray, got %s.\n" % type(probs_matrix).__name__
-        exception_handler(TypeError, errmsg, debug)
     if probs_matrix.size == 0 or sum(sum(probs_matrix)) == 0:
         errmsg = "Motif probability matrix is empty.\n"
         exception_handler(ValueError, errmsg, probs_matrix)
-    if not isinstance(alphabet, list):
-        errmsg = "Expected list, got %s.\n" % type(alphabet).__name__
-        exception_handler(TypeError, errmsg, debug)
     if not isListEqual(alphabet, DNA_ALPHABET):
         errmsg = "The motif is not built on DNA alphabet.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(bgs, dict):
-        errmsg = "Expected dict, got %s.\n" % type(bgs).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not isinstance(nucsmap, dict):
-        errmsg = "Expected dict, got %s.\n" % type(nucsmap).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not isinstance(pseudocount, float):
-        errmsg = "Expected numpy.double, got %s.\n" % type(pseudocount).__name__
-        exception_handler(TypeError, errmsg, debug)
     if pseudocount <= 0:
         errmsg = "Pseudocount values must be > 0.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(width, int):
-        errmsg = "Expected int, got %s.\n" % type(width).__name__
-        exception_handler(TypeError, errmsg, debug)
     if width <= 0:
         errmsg = "Forbidden motif width.\n"
         exception_handler(ValueError, errmsg, debug)
@@ -279,7 +251,6 @@ cdef capply_pseudocount_jaspar(
     cdef double total_counts
     cdef double count
     cdef double bg
-
     pseudo = pseudocount
     proc_matrix = np.zeros(counts_matrix.shape, dtype=np.double)
     for j in range(width):
@@ -343,8 +314,14 @@ def apply_pseudocount_jaspar(
     """
 
     return capply_pseudocount_jaspar(
-        counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, 
-        nucsmap, debug
+        counts_matrix, 
+        probs_matrix, 
+        pseudocount, 
+        bgs, 
+        width, 
+        alphabet, 
+        nucsmap, 
+        debug
     )
 
 
@@ -389,48 +366,26 @@ cdef capply_pseudocount_meme(
         processed motif probability matrix
     """
 
-    if not isinstance(probs_matrix, np.ndarray):
-        errmsg = "Expected numpy.ndarray, got %s.\n" % type(probs_matrix).__name__
-        exception_handler(TypeError, errmsg, debug)
     if probs_matrix.size == 0 or sum(sum(probs_matrix)) == 0:
         errmsg = "The probability matrix is empty.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(pseudocount, float):
-        errmsg = "Expected float, got %s.\n" % type(pseudocount).__name__
-        exception_handler(TypeError, errmsg, debug)
     if pseudocount <= 0:
         errmsg = "The pseudocount must be > 0."
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(site_counts, int):
-        errmsg = "Expected int, got %s.\n" % type(site_counts).__name__
-        exception_handler(TypeError, errmsg, debug)
     if site_counts <= 0:
         errmsg = "The site counts must be > 0.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(width, int):
-        errmsg = "Expected int, got %s.\n" % type(width).__name__
-        exception_handler(TypeError, errmsg, debug)
     if width <= 0:
         errmsg = "Forbidden motif width.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(bgs, dict):
-        errmsg = "Excpected dict, got %s.\n" % type(bgs).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not isinstance(alphabet, list):
-        errmsg = "Expected list, got %s.\n" % type(alphabet).__name__
-        exception_handler(TypeError, errmsg, debug)
     if not isListEqual(alphabet, DNA_ALPHABET):
         errmsg = "The motif is not built on DNA alphabet.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(nucsmap, dict):
-        errmsg = "Expected dict, got %s.\n" % type(nucsmap).__name__
-        exception_handler(TypeError, errmsg, debug)
 
     # ---- C vars
     cdef double total_counts
     cdef double bg
     cdef double count
-
     proc_matrix = np.zeros(probs_matrix.shape, dtype=np.double)
     total_counts = <double>site_counts + pseudocount
     for j in range(width):
@@ -438,9 +393,10 @@ cdef capply_pseudocount_meme(
             nucidx = nucsmap[nuc]
             bg = bgs[nuc]
             assert bg > 0
-            count = ((probs_matrix[nucidx, j] * site_counts) + (pseudocount * bg))
+            count = (
+                (probs_matrix[nucidx, j] * site_counts) + (pseudocount * bg)
+            )
             proc_matrix[nucidx, j] = count / total_counts
-
     return proc_matrix
 
 # end of capply_pseudocount_meme()
@@ -489,7 +445,14 @@ def apply_pseudocount_meme(
     """
 
     return capply_pseudocount_meme(
-        probs_matrix, pseudocount, site_counts, width, bgs, alphabet, nucsmap, debug
+        probs_matrix, 
+        pseudocount, 
+        site_counts, 
+        width, 
+        bgs, 
+        alphabet, 
+        nucsmap, 
+        debug
     )
 
 
@@ -521,31 +484,16 @@ cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet, nucsmap, debug):
         motif log-odds matrix
     """
 
-    if not isinstance(probs_matrix, np.ndarray):
-        errmsg = "Expected numpy.ndarray, got %s.\n" % type(probs_matrix).__name__
-        exception_handler(TypeError, errmsg, debug)
     if probs_matrix.size == 0 or sum(sum(probs_matrix)) == 0:
         errmsg = "The motif probability matrix is empty.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(width, int):
-        errmsg = "Expected int, got %s.\n" % type(width).__name__
-        exception_handler(TypeError, errmsg, debug)
     if width <= 0:
         errmsg = "Forbidden motif width.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(bgs, dict):
-        errmsg = "Expected dict, got %s.\n" % type(bgs).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not isinstance(alphabet, list):
-        errmsg = "Expected list, got %s.\n" % type(alphabet).__name__
-        exception_handler(TypeError, errmsg, debug)
     if not isListEqual(alphabet, DNA_ALPHABET):
         errmsg = "The motif is not built on DNA alphabet.\n"
         exception_handler(ValueError, errmsg, debug)
-    if not isinstance(nucsmap, dict):
-        errmsg = "Expected dict, got %s.\n" % type(nucsmap).__name__
-        exception_handler(TypeError, errmsg, debug)
-
+    
     # ---- C vars
     cdef double totBG
     cdef double totFG
@@ -554,7 +502,6 @@ cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet, nucsmap, debug):
     cdef double odds
     cdef double logodds
     cdef double epsilon
-
     totBG = 0
     totFG = 0
     epsilon = 0.001
@@ -573,7 +520,6 @@ cdef ccompute_log_odds(probs_matrix, int width, bgs, alphabet, nucsmap, debug):
             motif_log_odds[nucidx, j] = logodds
     assert totBG - 1.0 < epsilon
     assert totFG - width < epsilon
-
     return motif_log_odds
 
 # end of ccompute_log_odds()
@@ -641,10 +587,7 @@ cdef ccomp_pval_mat(motif, debug):
         P-value matrix
     """
 
-    if not isinstance(motif, Motif):
-        errmsg = "Expected Motif, got %s.\n" % type(motif).__name__
-        exception_handler(TypeError, errmsg, debug)
-    if not motif.isScaled:
+    if not motif.is_scaled:
         errmsg = "The motif score matrix has not been scaled yet.\n"
         exception_handler(MotifProcessingError, errmsg, debug)
 
@@ -652,14 +595,12 @@ cdef ccomp_pval_mat(motif, debug):
     cdef int width  # motif width
     cdef double bg  # background 
     cdef double source  
-
     # ---- Py vars
-    score_matrix = motif.scoreMatrix
+    score_matrix = motif.score_matrix
     width = motif.width
     alphabet = motif.alphabet
     bgs = motif.bg
     nucsmap = motif.nucsmap
-
     pval_mat = np.zeros((width, (RANGE * width + 1)))
     for pos in range(width):
         for nuc in alphabet:
@@ -674,8 +615,7 @@ cdef ccomp_pval_mat(motif, debug):
                         source = pval_mat[pos-1, idx]
                         pval_mat[pos, score_matrix[nucsmap[nuc], pos] + idx] += source * bg
     # keep only last row
-    pval_mat = pval_mat[width-1]
-
+    pval_mat = pval_mat[width - 1]
     return pval_mat
 
 # end of ccomp_pval_mat()
