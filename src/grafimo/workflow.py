@@ -9,6 +9,7 @@ all the arguments needed while executing the two operations.
 """
 
 from grafimo.utils import parse_namemap
+
 from typing import List, Dict
 from argparse import Namespace
 
@@ -89,31 +90,10 @@ class BuildVG(Workflow):
         get test flag
     """
 
-    #-------------------------------------------------------------------
-    # BuilVG attributes
-    #
-    _reference_genome: str
-    _vcf: str
-    _reindex: bool
-    _chroms: List
-    _chroms_num: int
-    _chroms_prefix: str
-    _chroms_namemap: Dict
-    _cores: int
-    _outdir: str
-    _debug: bool
-    _verbose: bool
-    _test: bool = False
-
-
-    #-------------------------------------------------------------------
-    # BuildVG methods
-    #
-
     # these errors should never appear --> no need for error formatting
     # can assume that debug mode == True
     def __init__(self, args: Namespace):
-        errmsg: str = "\n\nERROR: commandline parsing failed. Type mismatch: expected {}, got {} instance.\n"
+        errmsg = "\n\nERROR: commandline parsing failed. Type mismatch: expected {}, got {} instance.\n"
         if not isinstance(args, Namespace):
             raise TypeError(errmsg.format("Namespace", type(args).__name__))
         if not isinstance(args.linear_genome, str):
@@ -134,7 +114,6 @@ class BuildVG(Workflow):
             raise TypeError(errmsg.format("str", type(args.out).__name__))
         if not isinstance(args.verbose, bool):
             raise TypeError(errmsg.format("bool", type(args.verbose).__name__))
-
         self._reference_genome = args.linear_genome
         self._vcf = args.vcf
         self._reindex = args.reindex
@@ -145,7 +124,7 @@ class BuildVG(Workflow):
         self._cores = args.cores
         self._outdir = args.out
         self._verbose = args.verbose
-
+        self._test = False  # manually set
 
     def _get_reference_genome(self) -> str:
         if self._reference_genome:
@@ -363,44 +342,6 @@ class Findmotif(Workflow):
         set the whole genome variation graph 
     """
 
-    #-------------------------------------------------------------------
-    # Findmotif attributes
-    #
-    _graph_genome: str = None
-    _graph_genome_dir: str = None
-    _bedfile: str
-    _motif: list
-    _chroms: List
-    _chroms_num: int
-    _chroms_prefix: str
-    _chroms_namemap: Dict
-    _bgfile: str
-    _pseudo: float
-    _thresh: float
-    _outdir: str
-    _cores: int
-    _recomb = None
-    _top_graphs: int
-    _no_qvalue: bool
-    _no_rev: bool
-    _text_only: bool
-    _qvalueT: bool
-    _verbose: bool
-    _test: bool = False  # used to test the findmotif worflow (manually set)
-
-    # the following variables cannot be both True at the same time
-    _has_graph_genome: bool = False
-    _has_graph_genome_dir: bool = False
-
-
-    #-------------------------------------------------------------------
-    # Findmotif methods
-    #
-
-    #-------------------------------------------------------------------
-    # BuildVG methods
-    #
-
     # these errors should never appear --> no need for error formatting
     # can assume that debug mode == True
     def __init__(self, args):
@@ -445,7 +386,6 @@ class Findmotif(Workflow):
             raise TypeError(errmsg.format("bool", type(args.qval_t).__name__))
         if not isinstance(args.verbose, bool):
             raise TypeError(errmsg.format("bool", type(args.verbose).__name__))
-
         if args.graph_genome:
             self._graph_genome = args.graph_genome
             self._has_graph_genome = True
@@ -475,6 +415,7 @@ class Findmotif(Workflow):
         self._text_only = args.text_only
         self._qvalueT = args.qval_t
         self._verbose = args.verbose
+        self._test = False  # manually test
 
 
     def _get_graphgenome(self) -> str:

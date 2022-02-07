@@ -1,12 +1,13 @@
 """Functions and constant variables used in GRAFIMO code"""
 
 
-from grafimo.GRAFIMOException import NoDataFrameException
-from colorama import Fore, init 
 from typing import List, Optional, Tuple, Dict
+from colorama import Fore, init 
 from shutil import which
+
 import pandas as pd
 import numpy as np
+
 import gzip
 import sys
 import os
@@ -20,15 +21,15 @@ REV_COMPL = {"A":"T", "C":"G", "G":"C", "T":"A"}
 NOMAP = "NOMAP"
 ALL_CHROMS = "use_all_chroms"
 UNIF = "unfrm_dst"
-PSEUDObg = np.double(0.0000005)
+PSEUDOBG = np.double(0.0000005)
 LOG_FACTOR = 1.44269504
 RANGE = 1000
-CHROMS_LIST = [str(i) for i in range(1, 23)] + ['X', 'Y']
+CHROMS_LIST = [str(i) for i in range(1, 23)] + ["X", "Y"]
 DEFAULT_OUTDIR = "default_out_dir_name"
-EXT_DEPS = ['tabix', 'vg', 'dot']
-SOURCE = 'grafimo'
-TP = 'nucleotide_motif'
-PHASE = '.'
+EXT_DEPS = ["tabix", "vg", "dot"]
+SOURCE = "grafimo"
+TP = "nucleotide_motif"
+PHASE = "."
 
 
 #-----------------------------------------------------------------------
@@ -60,25 +61,26 @@ def sigint_handler() -> None:
 
 
 def exception_handler(
-    exception_type, 
-    exception, 
-    debug
-):
+    exception_type: Exception, 
+    exception: str, 
+    debug: bool
+) -> None:
     """Handle Exceptions for debugging purposes. If debug is set to True 
     the entire error traceback is printed to stderr, otherwise a 
     graceful error message is sent to stderr.
     """
+
     init()
     if debug:
-        raise exception_type("\n\n{}".format(exception))
+        raise exception_type(f"\n\n{exception}")
     else:
-        sys.stderr.write(Fore.RED + "\n\nERROR: " + "{}".format(exception) + Fore.RESET)
+        sys.stderr.write(Fore.RED + "\n\nERROR: " + f"{exception}" + Fore.RESET)
         die(1)
 
 # end of exception_handler()
 
 
-def parse_namemap(namemap_fn:str) -> Dict:
+def parse_namemap(namemap_fn: str) -> Dict:
     """Parse chromosome name-map file.
 
     Parameters
@@ -92,23 +94,23 @@ def parse_namemap(namemap_fn:str) -> Dict:
     """
 
     if not isinstance(namemap_fn, str):
-        errmsg = "\n\nERROR: expected str, got {}.\n"
-        raise TypeError(errmsg.format(type(namemap_fn).__name__))
+        errmsg = f"\n\nERROR: expected {str.__name__}, got {type(namemap_fn).__name__}.\n"
+        raise TypeError(errmsg)
     chroms_namemap = dict()
     if namemap_fn == NOMAP:  # no name-map file given -> return empty dict
         assert not bool(chroms_namemap)
     else:  # name-map file is given
         if not os.path.isfile(namemap_fn):
-            errmsg = "\n\nERROR: Unable to find {}.\n"
-            raise FileNotFoundError(errmsg.format(namemap_fn))
+            errmsg = f"\n\nERROR: Unable to find {namemap_fn}.\n"
+            raise FileNotFoundError(errmsg)
         try:
             with open(namemap_fn, mode="r") as infile:
                 for line in infile:
                     chrom, name = line.strip().split()
                     chroms_namemap.update({chrom:name})
         except:
-            errmsg = "\n\nERROR: a problem was encountered while reading {}.\n"
-            raise IOError(errmsg.format(namemap_fn))
+            errmsg = f"\n\nERROR: a problem was encountered while reading {namemap_fn}.\n"
+            raise IOError(errmsg)
         finally:
             infile.close()
         assert bool(chroms_namemap)
@@ -134,7 +136,6 @@ def isListEqual(lst1: List, lst2: List) -> bool:
 
     if (len(lst1) == len(lst2) and set(lst1) == set(lst2)):
         return True
-
     return False
 
 # end of isListEqual()
@@ -161,7 +162,7 @@ def anydup(lst: List) -> bool:
 # end of anydup()
 
 
-def initialize_chroms_list(args_chroms: List[str]):
+def initialize_chroms_list(args_chroms: List[str]) -> List[str]:
     """Initialize a list of chromomsome to use during GRAFIMO analysis.
 
     Parameters
@@ -177,10 +178,8 @@ def initialize_chroms_list(args_chroms: List[str]):
 
     if not args_chroms:
         chroms = CHROMS_LIST # all the chromosomes
-
     else:
         chroms = args_chroms # the given chromosomes
-
     return chroms
 
 # end of initialize_chroms_list()
@@ -198,9 +197,8 @@ def check_deps() -> Tuple[bool, List[str]]:
         list of dependencies not satisfied
     """
 
-    deps_not_sats: List[str] = list()
-    sat: bool = True
-
+    deps_not_sats = list()
+    sat = True
     for dep in EXT_DEPS:
         if not which(dep) is not None:
             deps_not_sats.append(dep)
@@ -228,14 +226,14 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = "\n\nERROR: Expected str, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
+        errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if not os.path.isfile(motif_file):
-        errmsg = "\n\nERROR: Unable to locate {}.\n"
-        exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
+        errmsg = f"\n\nERROR: Unable to locate {motif_file}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = "\n\nERROR: {} seems to be empty.\n"
-        exception_handler(EOFError, errmsg.format(motif_file), debug)
+        errmsg = f"\n\nERROR: {motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)
 
     ff = motif_file.split(".")[-1]
     if ff == "jaspar":
@@ -262,17 +260,17 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = "\n\nERROR: Expected str, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(motif_file).__name__), debug)
+        errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if not os.path.isfile(motif_file):
-        errmsg = "\n\nERROR: Unable to locate {}.\n"
-        exception_handler(FileNotFoundError, errmsg.format(motif_file), debug)
+        errmsg = f"\n\nERROR: Unable to locate {motif_file}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = "\n\nERROR: {} seems to be empty.\n"
-        exception_handler(EOFError, errmsg.format(motif_file), debug)
+        errmsg = f"\n\nERROR: {motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)
 
-    ifstream = open(motif_file, mode="r")
-    for line in ifstream:
+    handle = open(motif_file, mode="r")
+    for line in handle:
         if line.startswith("MEME version"): return True
     return False  # no MEME version found --> improper input
 
@@ -298,31 +296,32 @@ def isbed(bedfile: str, debug: bool) -> bool:
     """
 
     if not isinstance(bedfile, str):
-        errmsg = "Expected str, got {}.\n"
+        errmsg = f"Expected {str.__name__}, got {type(bedfile).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
     if not os.path.isfile(bedfile):
-        errmsg = "Unble to locate {}.\n"
+        errmsg = f"Unble to locate {bedfile}.\n"
         exception_handler(FileNotFoundError, errmsg, debug)
     
     # check if bed is gzipped
-    gzipped: bool = False
-    ff: str = bedfile.split(".")[-1]
-    if ff == "gz": gzipped = True
-    if gzipped: ifstream = gzip.open(bedfile, mode="rt")
-    else: ifstream = open(bedfile, mode="r")
-    for line in ifstream:
+    gzipped = False
+    ff = bedfile.split(".")[-1]
+    if ff == "gz": 
+        gzipped = True
+    if gzipped: 
+        handle = gzip.open(bedfile, mode="rt")
+    else: 
+        handle = open(bedfile, mode="r")
+    for line in handle:
         if line.startswith("chr"): 
-            if len(line.split()) >= 3: return True  # at least chrom, start, end
-            else: return False
+            if len(line.split()) >= 3: 
+                return True  # at least chrom, start, end
+            else: 
+                return False
     # if EOF reached and no line started with chr --> False
     return False
 
 
-def almost_equal(
-    value1: np.double,
-    value2: np.double,
-    slope: np.double
-) -> bool:
+def almost_equal(value1: np.double, value2: np.double, slope: np.double) -> bool:
     """Check if two values are close to each other, given a degree
     of tolerance (slope).
 
@@ -350,7 +349,7 @@ def almost_equal(
 
 
 def lg2(value: np.double) -> np.double:
-    """C like computation of log2
+    """C-like computation of log2
         
     Parameters
     ----------
@@ -389,8 +388,8 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
     """
 
     if not isinstance(data, pd.DataFrame):
-        errmsg = "Expected pandas.DataFrame, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(data).__name__), debug)
+        errmsg = f"Expected {pd.DataFrame.__name__}, got {type(data).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
     if len(data) == 0:
         errmsg = "Empty DataFrames cannot be converted to lists of values.\n"
         exception_handler(ValueError, errmsg, debug)
@@ -398,35 +397,53 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
         errmsg = "Not enough values to extract from the DataFrame.\n"
         exception_handler(ValueError, errmsg, debug)
     if not isinstance(no_qvalue, bool):
-        errmsg = "Expected bool, got {}.\n"
-        exception_handler(TypeError, errmsg.format(type(no_qvalue).__name__), debug)
+        errmsg = f"Expected {bool,__name__}, got {type(no_qvalue).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
 
-    seqnames: List[str] = data["sequence_name"].tolist()
-    starts: List[int] = data["start"].tolist()
-    stops: List[int] = data["stop"].tolist()
-    scores: List[np.double] = data["score"].tolist()
-    strands: List[str] = data["strand"].tolist()
-    motifIDs: List[str] = data["motif_id"].tolist()
-    motifNames: List[str] = data["motif_alt_id"].tolist()
-    pvalues: List[np.double] = data["p-value"].tolist()
-    sequences: List[str] = data["matched_sequence"].tolist()
-    frequencies:List[int] = data["haplotype_frequency"].tolist()
-    references: List[str] = data["reference"].tolist()
+    seqnames = data["sequence_name"].tolist()
+    starts = data["start"].tolist()
+    stops = data["stop"].tolist()
+    scores = data["score"].tolist()
+    strands = data["strand"].tolist()
+    motifIDs = data["motif_id"].tolist()
+    motifNames = data["motif_alt_id"].tolist()
+    pvalues = data["p-value"].tolist()
+    sequences = data["matched_sequence"].tolist()
+    frequencies = data["haplotype_frequency"].tolist()
+    references = data["reference"].tolist()
     if not no_qvalue:
-        qvalues: List[np.double] = data["q-value"].tolist()
+        qvalues = data["q-value"].tolist()
         summary = [
-            motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-            pvalues, sequences, frequencies, references, qvalues
+            motifIDs, 
+            motifNames, 
+            seqnames, 
+            starts, 
+            stops, 
+            strands, 
+            scores,
+            pvalues, 
+            sequences, 
+            frequencies, 
+            references, 
+            qvalues
         ]
     else:  # no_qvalue == True
         summary = [
-            motifIDs, motifNames, seqnames, starts, stops, strands, scores,
-            pvalues, sequences, frequencies, references
+            motifIDs, 
+            motifNames, 
+            seqnames, 
+            starts, 
+            stops, 
+            strands, 
+            scores,
+            pvalues, 
+            sequences, 
+            frequencies, 
+            references
         ]
     if any([len(seqnames) != len(l) for l in summary]):
         errmsg = "List length mismatch.\n"
         exception_handler(ValueError, errmsg, debug)
-
     return summary
 
 # end of dftolist()
@@ -435,12 +452,12 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
 def printProgressBar(
     iteration: int,
     total: int,
-    prefix: Optional[str] = '',
-    suffix: Optional[str] = '',
+    prefix: Optional[str] = "",
+    suffix: Optional[str] = "",
     decimals: Optional[int] = 1,
     length: Optional[int] = 50,
-    fill: Optional[str] = '=',
-    printEnd: Optional[str] ="\r"
+    fill: Optional[str] = "=",
+    printEnd: Optional[str] = "\r"
 ) -> None:
     """Print progress bar.
 
@@ -464,13 +481,17 @@ def printProgressBar(
         bar filling character
     printEnd : str
         bar ending character 
+
+    Returns
+    -------
+    None
     """
 
-    pct: str = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength: int = int(length * iteration // total)
+    pct = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
     # allocate space for the bar
-    bar: float = fill * filledLength + ' ' * (length - filledLength)  
-    print('\r%s [%s] %s%% %s' % (prefix, bar, pct, suffix), end = printEnd)
+    bar = fill * filledLength + ' ' * (length - filledLength)  
+    print("\r%s [%s] %s%% %s" % (prefix, bar, pct, suffix), end = printEnd)
     # new line when the bar is completely filled
     if iteration == total:
         print()

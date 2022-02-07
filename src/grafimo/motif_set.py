@@ -50,6 +50,7 @@ class MotifSet(object):
     #
 
     _motifs = list()
+    _motif_widths = set()
     _motifs_num = 0 
 
     #-------------------------------------------------------------------
@@ -67,16 +68,19 @@ class MotifSet(object):
         return len(self._motifs)
 
 
-    def addMotif(self, mtfs: List[Motif]) -> None:
-        if not isinstance(mtfs, list):
+    def add_motif(self, motifs: List[Motif]) -> None:
+        if not isinstance(motifs, list):
             errmsg = "\n\nERROR: Expected list, got {}.\n"
-            raise TypeError(errmsg.format(type(mtfs).__name__))
-        if not all(isinstance(m, Motif) for m in mtfs):
+            raise TypeError(errmsg.format(type(motifs).__name__))
+        if not all(isinstance(m, Motif) for m in motifs):
             errmsg = "\n\nERROR: One of the list elements is not of Motif type.\n"
             raise ValueError(errmsg)
-        self._motifs += mtfs
+        self._motifs += motifs
         self._motifs_num += len(self._motifs)  # update the motifs number
         assert self._motifs_num > 0
+        # update motif widths in the motifs set
+        for motif in motifs: 
+            self._motif_widths.add(motif.width)
 
 
     def _get_motifs(self) -> List[Motif]:
@@ -88,6 +92,14 @@ class MotifSet(object):
     @property
     def motifs(self):
         return self._get_motifs()
+
+
+    def _get_motif_widths(self):
+        return self._motif_widths
+
+    @property
+    def widths(self):
+        return self._get_motif_widths()
    
 
     def _get_size(self) -> int:
