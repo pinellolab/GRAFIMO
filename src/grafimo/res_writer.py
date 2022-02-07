@@ -76,7 +76,7 @@ def write_results(
     """
 
     if not isinstance(results, pd.DataFrame):
-        errmsg = f"Expected {type(pd.DataFrame).__name__}, got {type(resuls).__name__}.\n"
+        errmsg = f"Expected {type(pd.DataFrame).__name__}, got {type(results).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
     if len(results) == 0:
         errmsg = "No potential motif occurrence retreived.\n"

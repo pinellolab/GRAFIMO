@@ -209,7 +209,7 @@ def read_JASPAR_motif(
         alphabet = sorted(nucs) 
         # compute background
         if bg_file == UNIF: 
-            bgs = get_uniformBG(alphabet, debug)
+            bgs = get_uniform_bg(alphabet, debug)
         elif os.path.isfile(bg_file): 
             bgs = read_bg_file(bg_file, debug)
         else:
