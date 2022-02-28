@@ -21,7 +21,6 @@ space on disk and save memory when scanning it.
 
 
 from grafimo.utils import (
-    die, 
     sigint_handler, 
     exception_handler,
     ALL_CHROMS
@@ -43,17 +42,19 @@ def get_reference_genome_from_ucsc(debug: bool) -> str:
     database, in the current working directory and returns the path to 
     the corresponding FASTA file.
 
-    This function has been written only for test purposes
+    ** WARNING **: This function has been written only for test purposes.
+
+    ...
     
     Parameters
     ----------
     debug : bool
-        trace the complete error stack
+        Trace the complete error stack
 
     Returns
     -------
     str
-        path to the downloaded FASTA file (in .fa format)
+        Path to the downloaded FASTA file (in .fa format)
     """
 
     # download genome
@@ -100,15 +101,19 @@ def get_1000GProject_vcf(debug: bool) -> str:
     used to build the GBWT index and the corresponding haplotypes cannot
     be used. To use this features the VCF must be phased first.
 
+    ** WARNING **: This function has been written only for test purposes.
+
+    ...
+
     Parameters
     ----------
     debug : bool
-        trace the complete error stack
+        Trace the complete error stack
     
     Returns
     -------
     str
-        path to the downloaded VCF file (compressed)
+        Path to the downloaded VCF file (compressed)
     """
 
     # download the VCF
@@ -148,22 +153,25 @@ def construct_vg(buildvg_args: BuildVG, debug: bool) -> None:
     to set appropriately the number of cores to use. However, a whole
     genome graph can be still visited using a regular laptop using one 
     core.
+
+    ...
     
     Parameters
     ----------
-        buildvg_args : BuildVG
-            container for the arguments required to build the genome 
-            variation graph
+    buildvg_args : BuildVG
+        Command line arguments required to construct the VG.
+    debug : bool
+        Trace the full error stack.
 
     Returns
     -------
-        None 
+    None 
     """
     
     if not isinstance(buildvg_args, BuildVG):
         errmsg = f"Expectd {type(BuildVG).__name__} object, got {type(buildvg_args).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
-    
+    assert isinstance(debug, bool)
     # read the arguments to build the VGs
     reindex = buildvg_args.reindex
     chroms = buildvg_args.chroms
@@ -300,33 +308,32 @@ def build_vg(
     file of reference genome have format '>1' and not '>chr1'. Otherwise
     when indexing it the haplotype linking cannot be made.
 
-    TODO: fix chromosome naming linking when building GBWT
+    ...
     
     Parameters
     ----------
     vg : str
-        path to the genome variation graph
+        Path to the genome variation graph
     ref_genome : str
-        path to the reference genome FASTA file
+        Path to the reference genome FASTA file
     vcf : str
-        path to the phased VCF file (compressed)
+        Path to the phased VCF file (GZIP compressed)
     chrom_num : int
-        chromosome number for which the genome variation graph will be 
-        constructed (e.g. chromosome 1 ==> 1)
+        Chromosomes for which GRAFIMO will build the VG.
     threads : int 
-        number of threads to use while constructing the current VG
+        Number of threads to use.
         
     Returns
     -------
     int  
-        status of VG construction (0 == all ok; 1 == an error occurred)
+        VG construction operation status (0 == ok; 1 == error)
     """
 
     build = f"vg construct -t {threads} -r {ref_genome} -v {vcf} -R {chrom_num} -C -a -p > {vg}"
     code = subprocess.call(build, shell=True)
     if code != 0:  # an error occurred during VG construction 
         success = 1
-    else:  # all went well
+    else:  # construction OK
         success = 0
     return success
 
@@ -348,25 +355,26 @@ def index_vg(
     the graph data structure and retrieve the samples genomes. 
     
     The indexing operation could take some time.
+
+    ...
         
     Parameters
     ----------
     vg : str
-        path to the genome variation graph (VG format)
+        Path to the genome variation graph (VG format).
     vcf : str 
-        path to the phased VCF file used to build the corresponding
-        VG
+        Path to the phased VCF file.
     threads : int
-        number of threads to use during indexing
+        Number of threads to use.
     verbose : bool
-        print information about graph indexing
+        Print some information about graph indexing
     debug : bool
-        trace the error stack
+        Trace the full error stack.
         
     Returns
     -------
     int
-        status of VG indexing (0 == all ok; 1 == an error occurred)
+        VG indexing operation status (0 == ok; 1 == error).
     """
 
     if not isinstance(vg, str):
@@ -401,18 +409,21 @@ def get_chromlist(ref_genome: str, debug: bool) -> List[str]:
     which there a sequence is available.
     
     The file must be in FASTA format and the chromosome names start with
-    '>chr' (e.g. '>chrX', '>chr1', etc.)
+    '>chr' (e.g. '>chrX', '>chr1', etc.).
+
+    ...
         
     Parameters
     ----------
     ref_genome : str
-        path to the reference genome FASTA file
+        Path to the reference genome FASTA file
+    debug : bool
+        Trace the full error stack.
         
     Returns
     -------
-    list
-        chomosomes for which a sequence is available in the given 
-        reference genome FASTA file 
+    List[str]
+        Chromosomes found in the input FASTA file.
     """
 
     assert os.path.isfile(ref_genome)
@@ -458,18 +469,19 @@ def get_chromlist(ref_genome: str, debug: bool) -> List[str]:
 
 
 def tbiexist(vcf: str) -> bool:
-    """Check if already exists an index for the VCF file.
+    """Check if already exists a TBI index for the input VCF file.
+
+    ...
 
     Parameters
     ----------
     vcf : str
-        path to VCF file
+        Path to VCF file
         
     Returns
     -------
     bool
-        Check result
-    
+        Result
     """
 
     vcf_tbi = ".".join([vcf, "tbi"])

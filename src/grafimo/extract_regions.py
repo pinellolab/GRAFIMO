@@ -65,16 +65,16 @@ def scan_graph(widths: Set[int], args_obj: Findmotif, debug: bool) -> str:
     Parameters
     ----------
     widths : Set[int]
-        motifs widths
+        Motifs widths
     args_obj : FindMotif
-        input arguments for the graph visit
+        VG visit options.
     debug : bool
-        trace the full error stack
+        Trace the full error stack
 
     Returns
     -------
     str
-        path to sequences location
+        Path to extracted sequences location
     """
 
     if not isinstance(widths, set):
@@ -252,14 +252,14 @@ def get_kmers(
 
     Parameters
     ----------
-    queries : list
-        list of queries
+    queries : List[str]
+        List of queries
     pool : multiprocessing.Pool
-        pool ps
+        Pool 
     debug : bool
-        trace the full error stack
-    verbose : bool, optional
-        print additional information
+        Trace the full error stack
+    verbose : bool
+        Print some information
 
     Returns
     -------
@@ -306,14 +306,14 @@ def get_kmers(
 
 
 def get_seqs(query: str) -> None:
-    """Retrieve k-mers within the genomic region. K is the motif width.
+    """Retrieve k-mers within the input genomic region. K is the motif width.
 
     ...
         
     Parameters
     ----------
     query : str
-        region query
+        Region query
 
     Returns 
     -------
@@ -340,14 +340,13 @@ def is_vg_indexed(vg: str, debug: bool) -> bool:
     Parameters
     ----------
     vg : str 
-        path to genome variation graph
+        Path to genome variation graph
     debug : bool
-        trace the full error stack
+        Trace the full error stack
         
     Returns
     -------
     bool
-        check result
     """
 
     if not isinstance(vg, str):
@@ -369,8 +368,10 @@ def is_vg_indexed(vg: str, debug: bool) -> bool:
 # end of is_vg_indexed()
 
 
-def get_regions_bed(bedfile: str, debug: bool) -> Tuple[Dict, int]:
-    """Read BED file and store genomic regions in a dictionary with the 
+def get_regions_bed(
+    bedfile: str, debug: bool
+) -> Tuple[Dict[str, List], int]:
+    """Read the input BED file and store genomic regions in a dictionary with 
     chromosome numbers as keys. This allows to optimize VG cache loading.
 
     ...
@@ -378,16 +379,16 @@ def get_regions_bed(bedfile: str, debug: bool) -> Tuple[Dict, int]:
     Parameters
     ----------
     bedfile : str 
-        path to BED file
+        Path to BED file
     debug : bool
-        trace the full error stack
+        Trace the full error stack
         
     Returns
     -------
-    dict
-        genomic regions grouped by chromosome
+    Dict[str, List]
+        Genomic regions grouped by chromosome
     int 
-        number of genomic regions
+        Number of genomic regions
     """
 
     if not isinstance(bedfile, str):
@@ -402,7 +403,6 @@ def get_regions_bed(bedfile: str, debug: bool) -> Tuple[Dict, int]:
     if os.stat(bedfile).st_size == 0:
         errmsg = f"{bedfile} is empty.\n"
         exception_handler(FileReadError, errmsg, debug)
-
     regions = dict()
     region_num = 0 
     gzipped = False 

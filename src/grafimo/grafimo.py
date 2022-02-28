@@ -17,10 +17,7 @@ from grafimo.score_sequences import compute_results
 from grafimo.utils import exception_handler
 from grafimo.grafimo_errors import VGError, SubprocessError
 
-import pandas as pd
-
 import subprocess
-import time
 import sys
 import os
 
@@ -196,7 +193,19 @@ def findmotif(args_obj: Findmotif, debug: bool) -> None:
 
 
 def printWelcomeMsg() -> None:
-    """Print GRAFIMO welcome message"""
+    """Print GRAFIMO welcome message.
+
+    ...
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
+    
     for _ in range(75): print('*', end='')
     msg = "\n\tWelcome to GRAFIMO v{}"
     print()  # newline

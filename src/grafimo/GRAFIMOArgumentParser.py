@@ -25,7 +25,6 @@ class GRAFIMOArgumentParser(ArgumentParser):
 
     ...
 
-
     Methods
     -------
     error(msg)
@@ -39,7 +38,6 @@ class GRAFIMOArgumentParser(ArgumentParser):
         This class defines a new help format for GRAFIMO
 
         ...
-
 
         Methods
         -------
@@ -94,10 +92,16 @@ class GRAFIMOArgumentParser(ArgumentParser):
         At the bottom is also printed a new message telling the 
         user how to call the help.
 
+        ...
+
         Parameters
         ----------
         msg : str
-            Message which will be shown when raising an error
+            Message to show when raising the error.
+        
+        Returns
+        -------
+        None
         """
 
         errmsg = Fore.RED + "\nERROR: " +  "{}." + Fore.RESET + "\n\nRun \"grafimo --help\" to see usage\n\n"
@@ -114,10 +118,15 @@ class GRAFIMOArgumentParser(ArgumentParser):
         calling grafimo from command line. Prints the general help 
         message.
 
+        ...
+
         Parameters
         ----------
-        msg : str
-            Message which will be shown when raising an error
+        None
+
+        Returns
+        -------
+        None
         """
         
         self.print_help()

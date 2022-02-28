@@ -27,7 +27,7 @@
 """
 GRAFIMO version {version}
 
-Copyright (C) 2021 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@univr.it>
+Copyright (C) 2022 Manuel Tognon <manu.tognon@gmail.com> <manuel.tognon@univr.it>
 
 GRAph-based Find of Individual Motif Occurrences.
 
@@ -74,8 +74,9 @@ GRAFIMO results are reported in three files (stored in a directory named `grafim
 
 Citation:
 
-    Tognon, Manuel, et al. "GRAFIMO: variant and haplotype aware motif scanning on 
-    pangenome graphs." bioRxiv (2021).
+    Tognon M, Bonnici V, Garrison E, Giugno R, Pinello L (2021) GRAFIMO: Variant and haplotype aware motif 
+    scanning on pangenome graphs. PLOS Computational Biology 17(9): e1009444. 
+    https://doi.org/10.1371/journal.pcbi.1009444
 
 
 Run "grafimo --help" to see all command-line options.
@@ -118,10 +119,13 @@ import os
 
 def get_parser() -> GRAFIMOArgumentParser:
     """Read the comman-line arguments given to GRAFIMO and creates a 
-    GRAFIMOArgumentParser object containing all of them
+    GRAFIMOArgumentParser object containing all of them.
+
+    ...
 
     Parameters
     ----------
+    None
 
     Returns
     -------
@@ -412,30 +416,42 @@ def get_parser() -> GRAFIMOArgumentParser:
 # end of get_parser()
 
 
-def main(cmdLineargs: Optional[List[str]] = None) -> None :
-    """GRAFIMO's main"""
+def main(cmdline_args: Optional[List[str]] = None) -> None :
+    """GRAFIMO's main.
+
+    ...
+
+    Parameters
+    ----------
+    cmdline_args : List[str]
+        Command line arguments
+    
+    Returns
+    -------
+    None
+    """
 
     try:
         # start GRAFIMO
         start = time.time()
         # parse command line
         parser = get_parser()
-        if cmdLineargs is None:
-            cmdLineargs = sys.argv[1:]  # read input args
+        if cmdline_args is None:
+            cmdline_args = sys.argv[1:]  # read input args
         # no argument given --> print help
-        if len(cmdLineargs) == 0:
+        if len(cmdline_args) == 0:
             parser.error_noargs()
             die(2)
         # the second command line argument must be buildvg or findmotif
         if (
-            (cmdLineargs[0] != "-h" and cmdLineargs[0] != "--help") and 
-            cmdLineargs[0] != "--version" and 
-            (cmdLineargs[0] != "buildvg" and cmdLineargs[0] != "findmotif")
+            (cmdline_args[0] != "-h" and cmdline_args[0] != "--help") and 
+            cmdline_args[0] != "--version" and 
+            (cmdline_args[0] != "buildvg" and cmdline_args[0] != "findmotif")
         ):
             parser.error(
                 "The second argument must be one between \"buildvg\" and \"findmotif\"")
             die(1)
-        args = parser.parse_args(cmdLineargs) 
+        args = parser.parse_args(cmdline_args) 
         if args.verbose:
             print("Parsing command line arguments...")
             start_args_parse = time.time()
@@ -842,5 +858,6 @@ def main(cmdLineargs: Optional[List[str]] = None) -> None :
 #-----------------------------------------------------------------------
 # Entry point for GRAFIMO
 #
+
 if __name__ == "__main__":
     main()
