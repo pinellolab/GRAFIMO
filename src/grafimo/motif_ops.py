@@ -12,8 +12,6 @@ TODO: manage TRANSFAC and PFM motif formats.
 """
 
 
-from genericpath import isfile
-from turtle import position
 from grafimo.grafimo_errors import BGFileError, MotifFileReadError, MotifFileFormatError
 from grafimo.utils import (
     DNA_ALPHABET, 
@@ -111,7 +109,7 @@ def build_motif_jaspar(
         errmsg = f"Expected bool, got {no_reverse}.\n"
         exception_handler(TypeError, errmsg, debug)
     # parse motif PWM
-    motif = read_JASPAR_motif(
+    motif = __read_jaspar_motif(
         motif_file, bg_file, pseudocount, no_reverse, verbose, debug
     )
     if verbose: 
@@ -127,7 +125,7 @@ def build_motif_jaspar(
 # end of build_motif_jaspar()
 
 
-def read_JASPAR_motif(
+def __read_jaspar_motif(
     motif_file: str,
     bg_file: str,
     pseudocount: float,
@@ -162,8 +160,8 @@ def read_JASPAR_motif(
         Motif object 
     """
 
-    nucs = list()
-    counts = list()
+    nucs = []
+    counts = []
     if verbose:
         start_rm = time.time()
     try:
@@ -235,7 +233,7 @@ def read_JASPAR_motif(
         handle.close() 
     return motif
 
-# end of read_JASPAR_motif()
+# end of __read_jaspar_motif()
 
 
 def build_motif_meme(
@@ -288,7 +286,7 @@ def build_motif_meme(
         exception_handler(FileNotFoundError, errmsg, debug)
     if verbose: 
         start_rm_all = time.time()
-    motif_lst = read_MEME_motif(
+    motif_lst = __read_meme_motif(
         motif_file, bg_file, pseudocount, no_reverse, verbose, debug
     )
     motif_num = len(motif_lst)
@@ -365,12 +363,8 @@ def build_motif_meme(
 # end build_motif_meme()
 
 
-def read_MEME_motif(motif_file: str,
-                    bg_file: str,
-                    pseudocount: float,
-                    no_reverse: bool,
-                    verbose: bool,
-                    debug: bool
+def __read_meme_motif(
+    motif_file: str, bg_file: str, pseudocount: float, no_reverse: bool, verbose: bool, debug: bool
 ) -> List[Motif]:
     """Read motif PWM in MEME file format.
 
@@ -426,15 +420,15 @@ def read_MEME_motif(motif_file: str,
     if not isinstance(no_reverse, bool):
         errmsg = f"Expected {bool.__name__}, got {type(no_reverse).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
-    motifs_raw = list()
-    motifs = list()
+    motifs_raw = []
+    motifs = []
     motifs_num = 0
     proceed = False
     # begin motif parsing
     try:
         handle = open(motif_file, mode="r")
         alphabet = __read_alphabet_meme(motif_file, handle, debug)  # shared by all motifs 
-        nucsmap = dict()  # used with np object
+        nucsmap = {}  # used with np object
         for i in range(len(alphabet)): nucsmap.update({alphabet[i]:i})
         while True:
             for line in handle:
@@ -517,7 +511,7 @@ def read_MEME_motif(motif_file: str,
         handle.close()
     return motifs
 
-# end read_MEME_motif()
+# end __read_meme_motif()
 
 
 def __read_alphabet_meme(
@@ -682,7 +676,7 @@ def build_motif_transfac(
     if not isinstance(bgfile, str):
         errmsg = f"Expected {str.__name__}, got {type(bgfile).__name__}."
         exception_handler(TypeError, errmsg, debug)
-    if not os.path.isfile(bgfile):
+    if bgfile != UNIF and not os.path.isfile(bgfile):
         errmsg = f"Unable to locate {bgfile}"
         exception_handler(FileNotFoundError, errmsg, debug)
     if not isinstance(pseudocount, float):

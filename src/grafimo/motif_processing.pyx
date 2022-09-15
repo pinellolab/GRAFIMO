@@ -302,9 +302,9 @@ def apply_pseudocount_jaspar_transfac(
     Returns
     -------
     numpy.ndarray 
-    """"
+    """
 
-    return capply_pseudocount_jaspar(
+    return capply_pseudocount_jaspar_transfac(
         counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, nucsmap, debug
     )
 
