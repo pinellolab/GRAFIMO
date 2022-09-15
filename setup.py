@@ -73,7 +73,7 @@ class SDist(sd):
         super().run()
 
 name = "GRAFIMO"
-version = "1.1.5"
+version = "1.1.6"
 
 # definition of setup()
 setup(

@@ -189,44 +189,36 @@ def get_uniform_bg(alphabet: List[str], debug: bool) -> Dict[str, float]:
 
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar(
-    counts_matrix, 
-    probs_matrix, 
-    double pseudocount, 
-    bgs,
-    int width, 
-    alphabet,
-    nucsmap,
-    debug
+cdef capply_pseudocount_jaspar_transfac(
+    counts_matrix, probs_matrix, double pseudocount, bgs, int width, alphabet, nucsmap, debug
 ):
-    """Apply pseudocount value to motif counts matrix. The motif PWM is given in
-    JASPAR file format.
+    """Apply pseudocount value to motif counts matrix. The functions applies 
+    pseudocount values to motifs in JASPAR, or TRANSFAC format.
 
     ...
 
     Parameters
     ----------
     counts_matrix : numpy.ndarray
-        motif raw counts matrix 
+        Motif raw counts matrix 
     probs_matrix : numpy.ndarray 
-        motif probability motif matrix 
+        Motif probability motif matrix 
     pseudocount : numpy.double  
-        pseudocount
+        Pseudocount
     width : int
-        motif width 
+        Motif width 
     bgs : dict 
-        background probability distribution 
+        Background probability distribution 
     alphabet : list 
-        motif alphabet
+        Motif alphabet
     nucsmap : dict
-        nucleotide ndarray index map
+        Nucleotide ndarray index map
     debug : bool
-        trace the full error stack
+        Trace the full error stack
         
     Returns
     -------
     numpy.ndarray 
-        processed motif probability matrix
     """
 
     if counts_matrix.size == 0 or sum(sum(counts_matrix)) == 0:
@@ -271,7 +263,7 @@ cdef capply_pseudocount_jaspar(
 # end capply_pseudocount_jaspar()
 
 
-def apply_pseudocount_jaspar(
+def apply_pseudocount_jaspar_transfac(
     counts_matrix: pd.DataFrame, 
     probs_matrix: pd.DataFrame, 
     pseudocount: np.double, 
@@ -283,45 +275,37 @@ def apply_pseudocount_jaspar(
 ) -> np.ndarray:
     """Python wrapper for capply_pseudocount_jaspar() function.
     
-    Apply pseudocount value to motif counts matrix. The motif PWM is given in
-    JASPAR file format.
+    Apply pseudocount value to motif counts matrix. The functions applies 
+    pseudocount values to motifs in JASPAR, or TRANSFAC format.
 
     ...
 
     Parameters
     ----------
     counts_matrix : numpy.ndarray
-        motif raw counts matrix 
+        Motif raw counts matrix 
     probs_matrix : numpy.ndarray 
-        motif probability motif matrix 
+        Motif probability motif matrix 
     pseudocount : numpy.double  
-        pseudocount
+        Pseudocount
     width : int
-        motif width 
+        Motif width 
     bgs : dict 
-        background probability distribution 
+        Background probability distribution 
     alphabet : list 
-        motif alphabet
+        Motif alphabet
     nucsmap : dict
-        nucleotide ndarray index map
+        Nucleotide ndarray index map
     debug : bool
-        trace the full error stack
+        Trace the full error stack
         
     Returns
     -------
     numpy.ndarray 
-        processed motif probability matrix
-    """
+    """"
 
     return capply_pseudocount_jaspar(
-        counts_matrix, 
-        probs_matrix, 
-        pseudocount, 
-        bgs, 
-        width, 
-        alphabet, 
-        nucsmap, 
-        debug
+        counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, nucsmap, debug
     )
 
 

@@ -8,9 +8,9 @@ how to call the command-line help.
 
 from grafimo.grafimo import __version__
 
-from argparse import ArgumentParser, SUPPRESS, HelpFormatter
-from typing import List, Tuple, Dict, Optional
-from colorama import Fore, init 
+from argparse import SUPPRESS, ArgumentParser, HelpFormatter
+from typing import Dict, Optional, Tuple
+from colorama import Fore 
 
 import sys
 

@@ -85,17 +85,16 @@ See https://github.com/pinellolab/GRAFIMO/wiki or https://github.com/InfOmics/GR
 
 
 from grafimo.utils import (
-    initialize_chroms_list,
     exception_handler,
     sigint_handler,
-    isJaspar_ff,
-    isMEME_ff,
+    is_jaspar,
+    is_meme,
+    is_transfac,
     check_deps,
     isbed,
     anydup,
     die, 
     EXT_DEPS, 
-    CHROMS_LIST, 
     DEFAULT_OUTDIR, 
     NOMAP, 
     ALL_CHROMS, 
@@ -111,7 +110,6 @@ from glob import glob
 
 import multiprocessing as mp
 
-import argparse
 import time
 import sys
 import os
@@ -723,14 +721,14 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
                 else:
                     motifs = args.motif
                     for m in motifs:
-                        if not isMEME_ff(m, args.debug) and not isJaspar_ff(m, args.debug):
-                            parser.error(
-                                "Unrecognized motif PWM file format. "
-                                f"{m} does not follow the MEME or JASPAR format rules"
-                            )
-                            die(1)
                         if not os.path.isfile(m):
                             parser.error(f"Unable to locate {m}")
+                            die(1)
+                        if (
+                            not is_meme(m, args.debug) and not is_jaspar(m, args.debug) and not is_transfac(m, args.debug)
+                        ):
+                            parser.error("Unrecognized motif format. GRAFIMO accepts motifs in JASPAR, MEME, or TRANSFAC format")
+                            die(1)
                 # background file
                 if args.bgfile != UNIF:
                     if not os.path.isfile(args.bgfile):
@@ -822,12 +820,13 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
             sys.stderr.write(f"Checking GRAFIMO external dependencies {EXT_DEPS}\n")
             start_deps = time.time()  
         satisfied, deps_lack = check_deps()
-        if not satisfied and len(deps_lack) > 0:
-            errmsg = f"Some dependencies are not satisfied: {deps_lack}.\nPlease solve them before running GRAFIMO.\n"
-            exception_handler(DependencyError, errmsg, args.debug)
-        elif not satisfied and len(deps_lack) <= 0:
-            errmsg = "Dependencies satisfied, but unable to recover them.\n Be sure they are in system PATH.\n"
-            exception_handler(DependencyError, errmsg, args.debug)
+        # TODO: restore lines below
+        # if not satisfied and len(deps_lack) > 0:
+        #     errmsg = f"Some dependencies are not satisfied: {deps_lack}.\nPlease solve them before running GRAFIMO.\n"
+        #     exception_handler(DependencyError, errmsg, args.debug)
+        # elif not satisfied and len(deps_lack) <= 0:
+        #     errmsg = "Dependencies satisfied, but unable to recover them.\n Be sure they are in system PATH.\n"
+        #     exception_handler(DependencyError, errmsg, args.debug)
         if args.verbose and satisfied:
             end_deps = time.time()
             print("Dependencies satisfied.")
