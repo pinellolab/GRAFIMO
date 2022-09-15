@@ -90,6 +90,7 @@ from grafimo.utils import (
     is_jaspar,
     is_meme,
     is_transfac,
+    is_pfm,
     check_deps,
     isbed,
     anydup,
@@ -725,9 +726,12 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
                             parser.error(f"Unable to locate {m}")
                             die(1)
                         if (
-                            not is_meme(m, args.debug) and not is_jaspar(m, args.debug) and not is_transfac(m, args.debug)
+                            not is_meme(m, args.debug) and not is_jaspar(m, args.debug) and 
+                            not is_transfac(m, args.debug) and not is_pfm(m, args.debug)
                         ):
-                            parser.error("Unrecognized motif format. GRAFIMO accepts motifs in JASPAR, MEME, or TRANSFAC format")
+                            parser.error(
+                                "Unrecognized motif format. GRAFIMO accepts motifs in JASPAR, MEME, TRANSFAC , or PFM format"
+                            )
                             die(1)
                 # background file
                 if args.bgfile != UNIF:

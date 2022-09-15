@@ -14,7 +14,7 @@ from grafimo.motif_set import MotifSet
 from grafimo.extract_regions import scan_graph
 from grafimo.res_writer import print_results, write_results
 from grafimo.score_sequences import compute_results
-from grafimo.utils import exception_handler, is_jaspar, is_meme, is_transfac
+from grafimo.utils import exception_handler, is_jaspar, is_meme, is_transfac, is_pfm
 from grafimo.grafimo_errors import VGError, SubprocessError
 
 import subprocess
@@ -174,6 +174,8 @@ def findmotif(workflow: Findmotif, debug: bool) -> None:
             print("is MEME")
         if is_transfac(motif, True): 
             print("is TRANSFAC")
+        if is_pfm(motif, True): 
+            print("is PFM")
         sys.exit(3)
 
 

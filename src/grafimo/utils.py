@@ -233,12 +233,28 @@ def is_jaspar(motif_file: str, debug: bool) -> bool:
         exception_handler(FileNotFoundError, errmsg, debug)
     if os.stat(motif_file).st_size == 0:
         errmsg = f"{motif_file} seems to be empty.\n"
-        exception_handler(EOFError, errmsg, debug)
-
+        exception_handler(EOFError, errmsg, debug)  
     ff = motif_file.split(".")[-1]
-    if ff == "jaspar":
-        return True
-    return False
+    if ff != "jaspar":
+        return False
+    try:
+        handle = open(motif_file, mode="r")
+        header = handle.readline().strip()
+        if not header.startswith(">"):  # JASPAR headers must always start with '>'
+            return False 
+        for line in handle:
+            line = line.strip().split()
+            if not line:
+                return False  # empty line?
+            if line[1] != "[" or line[-1] != "]":
+                return False
+            counts = line[2:-1]
+            if any([not is_numeric(c, debug) for c in counts]):
+                return False
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}"
+        exception_handler(OSError, errmsg, debug)
+    return True
 
 # end of is_jaspar()
 
@@ -315,7 +331,6 @@ def is_transfac(motif_file: str, debug: bool) -> bool:
             line_split = line.split(None, 1)
             field = line_split[0].strip()
             if len(field) != 2:
-                print("ok")
                 return False  # not TRANSFAC file
             if len(line_split) == 2:  # field - value tuple
                 value = line_split[1].strip()
@@ -344,6 +359,46 @@ def is_transfac(motif_file: str, debug: bool) -> bool:
     if sum(transfac_fields.values()) == 3:
         return True
     return False  # something went wrong
+
+def is_pfm(motif_file: str, debug: bool) -> bool:
+    """Check if the input motif file is in PFM format.
+    The function assumes that each file contains at most ONE motif.
+
+    ...
+
+    Parameters
+    ----------
+    motif_file: str
+        Motif file
+    debug:
+        Print the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(motif_file, str):
+        errmsg = f"Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
+    if not os.path.isfile(motif_file):
+        errmsg = f"Unable to locate {motif_file}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
+    if os.stat(motif_file).st_size == 0:
+        errmsg = f"{motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)
+    try:
+        handle = open(motif_file, mode="r")
+        for line in handle:
+            if line.startswith(">"):
+                continue  # probably PFM from JASPAR db
+            counts = line.strip().split()
+            if any([not is_numeric(c, debug) for c in counts]):
+                return False
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}"
+        exception_handler(OSError, errmsg, debug)
+    return True  # everything was OK
 
 
 def isbed(bedfile: str, debug: bool) -> bool:
@@ -516,6 +571,33 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
     return summary
 
 # end of dftolist()
+
+
+def is_numeric(s: str, debug: bool) -> bool:
+    """Check wheter a string contains only digits.
+
+    ...
+    
+    Parameters
+    ----------
+    s : str
+        Input string
+    debug : bool
+        Trace the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(s, str):
+        errmsg = f"Expected {str.__name__}, got {type(s).__name__}."
+        exception_handler(TypeError, errmsg, debug)
+    try: 
+        float(s)
+    except ValueError:
+        return False
+    return True
 
 
 def printProgressBar(
