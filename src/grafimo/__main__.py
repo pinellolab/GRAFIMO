@@ -85,17 +85,17 @@ See https://github.com/pinellolab/GRAFIMO/wiki or https://github.com/InfOmics/GR
 
 
 from grafimo.utils import (
-    initialize_chroms_list,
     exception_handler,
     sigint_handler,
-    isJaspar_ff,
-    isMEME_ff,
+    is_jaspar,
+    is_meme,
+    is_transfac,
+    is_pfm,
     check_deps,
     isbed,
     anydup,
     die, 
     EXT_DEPS, 
-    CHROMS_LIST, 
     DEFAULT_OUTDIR, 
     NOMAP, 
     ALL_CHROMS, 
@@ -111,7 +111,6 @@ from glob import glob
 
 import multiprocessing as mp
 
-import argparse
 import time
 import sys
 import os
@@ -723,14 +722,17 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
                 else:
                     motifs = args.motif
                     for m in motifs:
-                        if not isMEME_ff(m, args.debug) and not isJaspar_ff(m, args.debug):
-                            parser.error(
-                                "Unrecognized motif PWM file format. "
-                                f"{m} does not follow the MEME or JASPAR format rules"
-                            )
-                            die(1)
                         if not os.path.isfile(m):
                             parser.error(f"Unable to locate {m}")
+                            die(1)
+                        if (
+                            not is_meme(m, args.debug) and not is_jaspar(m, args.debug) and 
+                            not is_transfac(m, args.debug) and not is_pfm(m, args.debug)
+                        ):
+                            parser.error(
+                                "GRAFIMO supports motifs in JASPAR, MEME, TRANSFAC, or PFM formats."
+                            )
+                            die(1)
                 # background file
                 if args.bgfile != UNIF:
                     if not os.path.isfile(args.bgfile):

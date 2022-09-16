@@ -76,7 +76,6 @@ class NotValidMotifMatrixError(GRAFIMOError):
     """Raise when the motif object is initialized with a not valid motif 
     matrix
     """
-
     pass
 
 
@@ -84,6 +83,5 @@ class SubprocessError(GRAFIMOError):
     """Raise if a subprocess call returned an exit status different 
     from 0 (an error occurred)
     """
-
     pass
 

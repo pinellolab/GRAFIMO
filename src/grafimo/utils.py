@@ -209,7 +209,7 @@ def check_deps() -> Tuple[bool, List[str]]:
 # end of check_deps()
 
 
-def isJaspar_ff(motif_file: str, debug: bool) -> bool:
+def is_jaspar(motif_file: str, debug: bool) -> bool:
     """Check if the given motif file is a JASPAR file.
         
     Parameters
@@ -226,24 +226,40 @@ def isJaspar_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        errmsg = f"Expected {str.__name__}, got {type(motif_file).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
     if not os.path.isfile(motif_file):
-        errmsg = f"\n\nERROR: Unable to locate {motif_file}.\n"
+        errmsg = f"Unable to locate {motif_file}.\n"
         exception_handler(FileNotFoundError, errmsg, debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = f"\n\nERROR: {motif_file} seems to be empty.\n"
-        exception_handler(EOFError, errmsg, debug)
-
+        errmsg = f"{motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)  
     ff = motif_file.split(".")[-1]
-    if ff == "jaspar":
-        return True
-    return False
+    if ff != "jaspar":
+        return False
+    try:
+        handle = open(motif_file, mode="r")
+        header = handle.readline().strip()
+        if not header.startswith(">"):  # JASPAR headers must always start with '>'
+            return False 
+        for line in handle:
+            line = line.strip().split()
+            if not line:
+                return False  # empty line?
+            if line[1] != "[" or line[-1] != "]":
+                return False
+            counts = line[2:-1]
+            if any([not is_numeric(c, debug) for c in counts]):
+                return False
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}"
+        exception_handler(OSError, errmsg, debug)
+    return True
 
-# end of isJaspar_ff()
+# end of is_jaspar()
 
 
-def isMEME_ff(motif_file: str, debug: bool) -> bool:
+def is_meme(motif_file: str, debug: bool) -> bool:
     """Check if the given motif file is a MEME file.
         
     Parameters
@@ -260,21 +276,133 @@ def isMEME_ff(motif_file: str, debug: bool) -> bool:
     """
 
     if not isinstance(motif_file, str):
-        errmsg = f"\n\nERROR: Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        errmsg = f"Expected {str.__name__}, got {type(motif_file).__name__}.\n"
         exception_handler(TypeError, errmsg, debug)
     if not os.path.isfile(motif_file):
-        errmsg = f"\n\nERROR: Unable to locate {motif_file}.\n"
+        errmsg = f"Unable to locate {motif_file}.\n"
         exception_handler(FileNotFoundError, errmsg, debug)
     if os.stat(motif_file).st_size == 0:
-        errmsg = f"\n\nERROR: {motif_file} seems to be empty.\n"
+        errmsg = f"{motif_file} seems to be empty.\n"
         exception_handler(EOFError, errmsg, debug)
-
-    handle = open(motif_file, mode="r")
-    for line in handle:
-        if line.startswith("MEME version"): return True
+    try:
+        handle = open(motif_file, mode="r")
+        for line in handle:
+            if line.startswith("MEME version"): 
+                return True
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}."
+        exception_handler(OSError, errmsg, debug)
     return False  # no MEME version found --> improper input
 
-# end of isMEME_ff()
+# end of is_meme()
+
+
+def is_transfac(motif_file: str, debug: bool) -> bool:
+    """Check if the input motif file is in TRANSFAC format.
+    The function assumes that each file contains at most ONE motif.
+
+    ...
+
+    Parameters
+    ----------
+    motif_file: str
+        Motif file
+    debug:
+        Print the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(motif_file, str):
+        errmsg = f"Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
+    if not os.path.isfile(motif_file):
+        errmsg = f"Unable to locate {motif_file}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
+    if os.stat(motif_file).st_size == 0:
+        errmsg = f"{motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)
+    transfac_fields = {"AC": False, "ID": False, "PO": False}
+    width = 0
+    try:
+        handle = open(motif_file, mode="r")
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue  # empty lines allowed in TRANSFAC format
+            line_split = line.split(None, 1)
+            field = line_split[0].strip()
+            if len(field) != 2:
+                return False  # not TRANSFAC file
+            if len(line_split) == 2:  # field - value tuple
+                value = line_split[1].strip()
+                if field in transfac_fields.keys():
+                    if not value:
+                        return False  # empty value?
+                    if field in ("P0", "PO"):  # old TRANSFAC files use PO instead of P0
+                        motif_alphabet = value.split()[:4]
+                        if motif_alphabet != DNA_ALPHABET:
+                            return False  # not DNA motif?
+                    transfac_fields[field] = True
+                try:
+                    position = int(field)  # check if counts line
+                except:
+                    continue
+                else:
+                    if width == 0 and position == 0:
+                        return False  # TRANSFAC motifs start from 0
+                    width += 1
+                    if width != position:
+                        return False  # position mismatch
+    except:
+        exception_handler(OSError, f"An error occurred while parsing {motif_file}", debug)
+    finally:
+        handle.close()  # close the stream
+    if sum(transfac_fields.values()) == 3:
+        return True
+    return False  # something went wrong
+
+def is_pfm(motif_file: str, debug: bool) -> bool:
+    """Check if the input motif file is in PFM format.
+    The function assumes that each file contains at most ONE motif.
+
+    ...
+
+    Parameters
+    ----------
+    motif_file: str
+        Motif file
+    debug:
+        Print the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(motif_file, str):
+        errmsg = f"Expected {str.__name__}, got {type(motif_file).__name__}.\n"
+        exception_handler(TypeError, errmsg, debug)
+    if not os.path.isfile(motif_file):
+        errmsg = f"Unable to locate {motif_file}.\n"
+        exception_handler(FileNotFoundError, errmsg, debug)
+    if os.stat(motif_file).st_size == 0:
+        errmsg = f"{motif_file} seems to be empty.\n"
+        exception_handler(EOFError, errmsg, debug)
+    try:
+        handle = open(motif_file, mode="r")
+        for line in handle:
+            if line.startswith(">"):
+                continue  # probably PFM from JASPAR db
+            counts = line.strip().split()
+            if any([not is_numeric(c, debug) for c in counts]):
+                return False
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}"
+        exception_handler(OSError, errmsg, debug)
+    return True  # everything was OK
 
 
 def isbed(bedfile: str, debug: bool) -> bool:
@@ -449,7 +577,34 @@ def dftolist(data: pd.DataFrame, no_qvalue: bool, debug: bool) -> List:
 # end of dftolist()
 
 
-def printProgressBar(
+def is_numeric(s: str, debug: bool) -> bool:
+    """Check wheter a string contains only digits.
+
+    ...
+    
+    Parameters
+    ----------
+    s : str
+        Input string
+    debug : bool
+        Trace the full error stack
+    
+    Returns
+    -------
+    bool
+    """
+
+    if not isinstance(s, str):
+        errmsg = f"Expected {str.__name__}, got {type(s).__name__}."
+        exception_handler(TypeError, errmsg, debug)
+    try: 
+        float(s)
+    except ValueError:
+        return False
+    return True
+
+
+def print_progress_bar(
     iteration: int,
     total: int,
     prefix: Optional[str] = "",
@@ -496,5 +651,5 @@ def printProgressBar(
     if iteration == total:
         print()
 
-# end of printProgressBar()
+# end of print_progress_bar()
 

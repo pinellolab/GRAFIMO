@@ -431,7 +431,7 @@ def print_results(results: pd.DataFrame, debug: bool) -> None:
         exception_handler(TypeError, errmsg, debug)
     # little hack in pd df parameters to avoid the weird default
     # print of a DataFrame (cut the majority of lines)
-    pd.set_option("display.max_rows", len(results))
+    pd.set_option("display.max_columns", None)  # ensure that all columns are displayed
     print()  # newline
     print(results)
     pd.reset_option("display.max_rows")

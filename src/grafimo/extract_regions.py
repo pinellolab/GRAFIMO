@@ -24,7 +24,7 @@ from grafimo.grafimo_errors import (
 )
 from grafimo.utils import (
     die, 
-    printProgressBar, 
+    print_progress_bar, 
     sigint_handler, 
     exception_handler,
     isbed,
@@ -277,13 +277,13 @@ def get_kmers(
             it = 0
             while (True):
                 if res.ready():
-                    printProgressBar(
+                    print_progress_bar(
                         tot, tot, prefix="Progress:", suffix="Complete", length=50
                     )
                     break
                 if it == 0: tot = res._number_left
                 remaining = res._number_left
-                printProgressBar(
+                print_progress_bar(
                     (tot - remaining), 
                     tot, 
                     prefix="Progress:", suffix="Complete", length=50
