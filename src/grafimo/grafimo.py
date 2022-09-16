@@ -166,20 +166,6 @@ def findmotif(workflow: Findmotif, debug: bool) -> None:
     for motif in motifs:
         if verbose:
             print(f"Processing motif(s) in: {motif}")
-
-        #TODO: remove below lines
-        if is_jaspar(motif, True): 
-            print("is JASPAR")
-        if is_meme(motif, True): 
-            print("is MEME")
-        if is_transfac(motif, True): 
-            print("is TRANSFAC")
-        if is_pfm(motif, True): 
-            print("is PFM")
-        sys.exit(3)
-
-
-
         m = get_motif_pwm(motif, workflow, cores, debug)
         if workflow.get_test():
             for i in range(len(m)):

@@ -6,11 +6,7 @@ scoring.
 
 The resulting scoring and P-value matrices are stored in the corresponding, 
 Motif objects.
-
-TODO: manage TRANSFAC and PFM motif formats.
-
 """
-
 
 from genericpath import isfile
 from grafimo.grafimo_errors import BGFileError, MotifFileReadError, MotifFileFormatError
@@ -928,7 +924,7 @@ def __read_pfm_motif(
     finally:
         handle.close()
     assert len(counts) == 4  # counts for each nucleotide
-    if any([len(c) != counts[0] for c in counts]):
+    if any([len(c) != len(counts[0]) for c in counts]):
         errmsg = "Mismatch in counts length."
         exception_handler(ValueError, errmsg, debug)
     nucsmap = {nt: i for i, nt in enumerate(DNA_ALPHABET)}

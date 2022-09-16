@@ -824,13 +824,12 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
             sys.stderr.write(f"Checking GRAFIMO external dependencies {EXT_DEPS}\n")
             start_deps = time.time()  
         satisfied, deps_lack = check_deps()
-        # TODO: restore lines below
-        # if not satisfied and len(deps_lack) > 0:
-        #     errmsg = f"Some dependencies are not satisfied: {deps_lack}.\nPlease solve them before running GRAFIMO.\n"
-        #     exception_handler(DependencyError, errmsg, args.debug)
-        # elif not satisfied and len(deps_lack) <= 0:
-        #     errmsg = "Dependencies satisfied, but unable to recover them.\n Be sure they are in system PATH.\n"
-        #     exception_handler(DependencyError, errmsg, args.debug)
+        if not satisfied and len(deps_lack) > 0:
+            errmsg = f"Some dependencies are not satisfied: {deps_lack}.\nPlease solve them before running GRAFIMO.\n"
+            exception_handler(DependencyError, errmsg, args.debug)
+        elif not satisfied and len(deps_lack) <= 0:
+            errmsg = "Dependencies satisfied, but unable to recover them.\n Be sure they are in system PATH.\n"
+            exception_handler(DependencyError, errmsg, args.debug)
         if args.verbose and satisfied:
             end_deps = time.time()
             print("Dependencies satisfied.")

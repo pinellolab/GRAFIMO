@@ -1,6 +1,6 @@
 from grafimo.constructVG import build_vg, index_vg
 from grafimo.motif_ops import (
-    build_motif_meme, build_motif_jaspar, build_motif_transfac
+    build_motif_meme, build_motif_jaspar, build_motif_transfac, build_motif_pfm
 )
 from grafimo.score_sequences import compute_results
 from grafimo.extract_regions import get_seqs
@@ -12,57 +12,57 @@ import pytest
 import os
 
 
-# def test_vg_construct():
+def test_vg_construct():
 
-#     test_ref = "test_data/input/test.fa"
-#     test_vcf = "test_data/input/test.vcf.gz"
-#     expected_vg = "test_data/expected_results/expected.vg"
-#     test_vg = "test.vg"
-#     # create vg and check results
-#     done = build_vg(test_vg, test_ref, test_vcf, "x", 1)
-#     print(os.stat(test_vg).st_size)
-#     print(os.stat(expected_vg).st_size)
-#     assert (
-#         (done == 0) and (os.stat(test_vg).st_size == os.stat(expected_vg).st_size)
-#     )
+    test_ref = "test_data/input/test.fa"
+    test_vcf = "test_data/input/test.vcf.gz"
+    expected_vg = "test_data/expected_results/expected.vg"
+    test_vg = "test.vg"
+    # create vg and check results
+    done = build_vg(test_vg, test_ref, test_vcf, "x", 1)
+    print(os.stat(test_vg).st_size)
+    print(os.stat(expected_vg).st_size)
+    assert (
+        (done == 0) and (os.stat(test_vg).st_size == os.stat(expected_vg).st_size)
+    )
 
-# # end of test_vg_construction()
-
-
-# def test_vg_index():
-
-#     test_vg = "test.vg"
-#     test_xg = "test.xg"
-#     test_gbwt = "test.gbwt"
-#     test_vcf = "test_data/input/test.vcf.gz"
-#     expected_xg = "test_data/expected_results/expected.xg"
-#     expected_gbwt = "test_data/expected_results/expected.gbwt"
-#     # index vg and check results
-#     done = index_vg(test_vg, test_vcf, 1, True, True)
-#     assert (
-#         (done == 0) and (os.stat(test_xg).st_size > 0) and (os.stat(test_gbwt).st_size > 0)
-#     )
-
-# # end of test_vg_index()
+# end of test_vg_construction()
 
 
-# def test_sequence_extraction():
+def test_vg_index():
 
-#     vg = "test.xg"
-#     region = "x:0-20"
-#     width = 19
-#     seqs_extracted = "seqs_extracted.tsv"
-#     expected_seqs = "test_data/expected_results/expected_seqs.tsv"
-#     # extract sequences and check results
-#     query = f"vg find -x {vg} -E -p {region} -K {width} > {seqs_extracted}"
-#     get_seqs(query)
-#     result = pd.read_csv(seqs_extracted, sep='\t', header=None).sort_values([1,2,3])
-#     result.index = range(len(result))  # with sort_values the indexes are not ordered
-#     expected = pd.read_csv(expected_seqs, sep='\t', header=None).sort_values([1,2,3])
-#     expected.index = range(len(expected))
-#     assert (result.equals(expected))
+    test_vg = "test.vg"
+    test_xg = "test.xg"
+    test_gbwt = "test.gbwt"
+    test_vcf = "test_data/input/test.vcf.gz"
+    expected_xg = "test_data/expected_results/expected.xg"
+    expected_gbwt = "test_data/expected_results/expected.gbwt"
+    # index vg and check results
+    done = index_vg(test_vg, test_vcf, 1, True, True)
+    assert (
+        (done == 0) and (os.stat(test_xg).st_size > 0) and (os.stat(test_gbwt).st_size > 0)
+    )
 
-# # end of test_sequence_extraction()
+# end of test_vg_index()
+
+
+def test_sequence_extraction():
+
+    vg = "test.xg"
+    region = "x:0-20"
+    width = 19
+    seqs_extracted = "seqs_extracted.tsv"
+    expected_seqs = "test_data/expected_results/expected_seqs.tsv"
+    # extract sequences and check results
+    query = f"vg find -x {vg} -E -p {region} -K {width} > {seqs_extracted}"
+    get_seqs(query)
+    result = pd.read_csv(seqs_extracted, sep='\t', header=None).sort_values([1,2,3])
+    result.index = range(len(result))  # with sort_values the indexes are not ordered
+    expected = pd.read_csv(expected_seqs, sep='\t', header=None).sort_values([1,2,3])
+    expected.index = range(len(expected))
+    assert (result.equals(expected))
+
+# end of test_sequence_extraction()
 
 
 def test_motif_processing_meme():
@@ -103,6 +103,18 @@ def test_motif_processing_transfac():
         transfacfn, "unfrm_dst", 0.1, False, False, True
     ).score_matrix
     assert (proc_motif_transfac == er_motif).all()
+
+
+def test_motif_processing_pfm():
+
+    er_motif_fn = "test_data/expected_results/motif_processing_test_jaspar.txt"
+    pfmfn = "test_data/input/MA0139.1.pfm"
+    er_motif = np.loadtxt(er_motif_fn).astype(int)
+    proc_motif_pfm = build_motif_pfm(
+        pfmfn, "unfrm_dst", 0.1, False, False, True
+    ).score_matrix
+    assert (proc_motif_pfm == er_motif).all()
+
 
 def test_scoring():
 

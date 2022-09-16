@@ -284,10 +284,14 @@ def is_meme(motif_file: str, debug: bool) -> bool:
     if os.stat(motif_file).st_size == 0:
         errmsg = f"{motif_file} seems to be empty.\n"
         exception_handler(EOFError, errmsg, debug)
-
-    handle = open(motif_file, mode="r")
-    for line in handle:
-        if line.startswith("MEME version"): return True
+    try:
+        handle = open(motif_file, mode="r")
+        for line in handle:
+            if line.startswith("MEME version"): 
+                return True
+    except:
+        errmsg = f"An error occurred while parsing {motif_file}."
+        exception_handler(OSError, errmsg, debug)
     return False  # no MEME version found --> improper input
 
 # end of is_meme()
