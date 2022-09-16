@@ -19,7 +19,7 @@ from grafimo.workflow import Findmotif
 from grafimo.resultsTmp import ResultTmp
 from grafimo.utils import (
     die, 
-    printProgressBar, 
+    print_progress_bar, 
     sigint_handler, 
     exception_handler
 )
@@ -146,13 +146,13 @@ def compute_results(
             jobs.append(p)
             p.start()  
         # to print 0%, otherwise start from % as first chunk id already completed completed
-        printProgressBar(
+        print_progress_bar(
             proc_finished, cores, prefix="Progress:", suffix="Complete", length=50
         )
         for job in jobs:
             job.join()  # sync point
             proc_finished += 1
-            printProgressBar(
+            print_progress_bar(
                 proc_finished, cores, prefix="Progress:", suffix="Complete", length=50
             )
     except KeyboardInterrupt:

@@ -189,11 +189,11 @@ def get_uniform_bg(alphabet: List[str], debug: bool) -> Dict[str, float]:
 
 
 ### post-process jaspar motif ###
-cdef capply_pseudocount_jaspar_transfac(
+cdef capply_pseudocount_jaspar_transfac_pfm(
     counts_matrix, probs_matrix, double pseudocount, bgs, int width, alphabet, nucsmap, debug
 ):
     """Apply pseudocount value to motif counts matrix. The functions applies 
-    pseudocount values to motifs in JASPAR, or TRANSFAC format.
+    pseudocount values to motifs in JASPAR, TRANSFAC, or PFM format.
 
     ...
 
@@ -263,7 +263,7 @@ cdef capply_pseudocount_jaspar_transfac(
 # end capply_pseudocount_jaspar()
 
 
-def apply_pseudocount_jaspar_transfac(
+def apply_pseudocount_jaspar_transfac_pfm(
     counts_matrix: pd.DataFrame, 
     probs_matrix: pd.DataFrame, 
     pseudocount: np.double, 
@@ -273,10 +273,10 @@ def apply_pseudocount_jaspar_transfac(
     nucsmap: Dict,
     debug: bool
 ) -> np.ndarray:
-    """Python wrapper for capply_pseudocount_jaspar() function.
+    """Python wrapper for capply_pseudocount_jaspar_transfac_pfm() function.
     
     Apply pseudocount value to motif counts matrix. The functions applies 
-    pseudocount values to motifs in JASPAR, or TRANSFAC format.
+    pseudocount values to motifs in JASPAR, TRANSFAC, or PFM format.
 
     ...
 
@@ -304,7 +304,7 @@ def apply_pseudocount_jaspar_transfac(
     numpy.ndarray 
     """
 
-    return capply_pseudocount_jaspar_transfac(
+    return capply_pseudocount_jaspar_transfac_pfm(
         counts_matrix, probs_matrix, pseudocount, bgs, width, alphabet, nucsmap, debug
     )
 

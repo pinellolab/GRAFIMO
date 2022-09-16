@@ -730,7 +730,7 @@ def main(cmdline_args: Optional[List[str]] = None) -> None :
                             not is_transfac(m, args.debug) and not is_pfm(m, args.debug)
                         ):
                             parser.error(
-                                "Unrecognized motif format. GRAFIMO accepts motifs in JASPAR, MEME, TRANSFAC , or PFM format"
+                                "GRAFIMO supports motifs in JASPAR, MEME, TRANSFAC, or PFM formats."
                             )
                             die(1)
                 # background file

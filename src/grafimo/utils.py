@@ -600,7 +600,7 @@ def is_numeric(s: str, debug: bool) -> bool:
     return True
 
 
-def printProgressBar(
+def print_progress_bar(
     iteration: int,
     total: int,
     prefix: Optional[str] = "",
@@ -647,5 +647,5 @@ def printProgressBar(
     if iteration == total:
         print()
 
-# end of printProgressBar()
+# end of print_progress_bar()
 
