@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/pinellolab/GRAFIMO.svg?branch=master)](https://travis-ci.org/pinellolab/GRAFIMO)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/platforms.svg)](https://anaconda.org/bioconda/grafimo)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/downloads.svg)](https://anaconda.org/bioconda/grafimo)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/license.svg)](https://anaconda.org/bioconda/grafimo)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/grafimo/badges/license.svg)](https://opensource.org/search/node/MIT)
 
 
 # GRAFIMO
